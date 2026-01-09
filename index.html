@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Qrivo - Painel de Vendas IA</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+    rel="stylesheet">
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          screens: {
+            'xs': '480px',
+            'xxl': '1440px',
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            primary: {
+              50: '#F1FCF6',
+              100: '#DBFBED',
+              500: '#09B86D',
+              600: '#059D5C',
+              700: '#098C55',
+              900: '#0D5A3C',
+              950: '#00331F',
+            },
+            secondary: {
+              50: '#F4F8F6',
+              100: '#DCEAE6',
+              500: '#046B62',
+              600: '#095751',
+              700: '#084A44',
+              800: '#07413C',
+              900: '#063834',
+              950: '#042522',
+            },
+            neutral: {
+              25: '#F8F6F5',
+              50: '#F3F3F0',
+              100: '#EEEEEC',
+              200: '#E7E7E3',
+              300: '#DCDCD5',
+              400: '#9B9B96',
+              500: '#82827C',
+              700: '#686863',
+              800: '#2C2C2A',
+              900: '#242422',
+              950: '#1F1F1D',
+              black: '#01030E',
+              white: '#FFFFFF',
+            },
+            system: {
+              info: { 800: '#1E40AF', 600: '#2563EB', 500: '#3B82F6' },
+              success: { 800: '#065F46', 600: '#059669', 500: '#10B981' },
+              warning: { 800: '#92400E', 600: '#D97706', 500: '#F59E0B' },
+              error: { 800: '#991B1B', 600: '#DC2626', 500: '#EF4444' },
+              highlight: { 800: '#5B21B6', 600: '#7C3AED', 500: '#8B5CF6' },
+            }
+          },
+          fontSize: {
+            'display': ['64px', { lineHeight: '1', fontWeight: '700' }],
+            'h1': ['40px', { lineHeight: '1.2', fontWeight: '700' }],
+            'h2': ['32px', { lineHeight: '1.2', fontWeight: '700' }],
+            'h3': ['24px', { lineHeight: '1.2', fontWeight: '700' }],
+            'h4': ['20px', { lineHeight: '1.2', fontWeight: '700' }],
+            'h5': ['18px', { lineHeight: '1.2', fontWeight: '700' }],
+            'body1': ['15px', { lineHeight: '1.4', fontWeight: '400' }],
+            'body2': ['13px', { lineHeight: '1.4', fontWeight: '400' }],
+            'tag': ['11px', { lineHeight: '18px', letterSpacing: '0.02em', fontWeight: '500' }],
+            'small': ['12px', { lineHeight: '17px', fontWeight: '400' }],
+          },
+          boxShadow: {
+            'small': '0px 1px 2px rgba(19,25,33,0.1)',
+            'cards': '0px 1px 2px rgba(0,0,0,0.1)',
+          },
+          borderRadius: {
+            'button': '8px',
+            'card': '12px',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #EEEEEC;
+      color: #242422;
+      font-family: 'Inter', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #DCDCD5;
+      border-radius: 10px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #9B9B96;
+    }
+
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+
+  <link rel="stylesheet" href="/index.css">
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+
+</html>

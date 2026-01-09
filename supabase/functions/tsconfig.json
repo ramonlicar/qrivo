@@ -1,0 +1,27 @@
+{
+    "compilerOptions": {
+        "target": "ESNext",
+        "module": "ESNext",
+        "lib": [
+            "ESNext",
+            "DOM"
+        ],
+        "strict": true,
+        "baseUrl": ".",
+        "paths": {
+            "https://deno.land/std@0.168.0/http/server.ts": [
+                "./deno_types.d.ts"
+            ],
+            "https://esm.sh/@supabase/supabase-js@2": [
+                "../../node_modules/@supabase/supabase-js"
+            ]
+        },
+        "types": [
+            "../../node_modules/@types/node"
+        ]
+    },
+    "include": [
+        "**/*.ts",
+        "deno_types.d.ts"
+    ]
+}

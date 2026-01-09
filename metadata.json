@@ -1,0 +1,8 @@
+{
+  "name": "Qrivo Admin",
+  "description": "Painel operacional focado em vendas assistidas por IA via WhatsApp para negócios locais.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
