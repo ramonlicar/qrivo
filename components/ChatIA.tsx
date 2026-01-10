@@ -1,7 +1,9 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from './Button';
+import ReactMarkdown from 'react-markdown';
 import { aiService, ChatMessage } from '../lib/aiService';
+import { CHAT_SYSTEM_INSTRUCTION } from '../lib/prompts';
 
 interface Message {
   role: 'user' | 'model';
@@ -57,21 +59,7 @@ export const ChatIA: React.FC = () => {
         parts: [{ text: m.content }]
       }));
 
-      const systemInstruction = `Você é o assistente virtual da Qrivo, uma plataforma SaaS de vendas via WhatsApp.
-          
-      DIRETRIZES DE ESTILO:
-      - NUNCA use marcação Markdown pesada (sem asteriscos duplos para negrito, sem hashtags gigantes).
-      - Use texto limpo, parágrafos curtos e emojis para tornar a leitura agradável.
-      - Tom: Parceiro de negócios, sagaz, prestativo e direto ao ponto.
-      
-      CONTEXTO DE SUPORTE:
-      - Pedidos: Podem ser vistos na aba 'Pedidos'. Status mudam para 'Entregue' via botão confirmar.
-      - Produtos: Cadastro manual no menu 'Produtos'. Tem ferramenta de IA para descrições.
-      - Vendedor IA: Pode ser treinado no menu 'Vendedor IA'. Configura-se tom de voz e catálogo.
-      - Integração: Conecta com número de WhatsApp via menu 'Ajustes' ou 'Vendedor IA'.
-      
-      Se o usuário pedir para cadastrar algo, diga que ele pode fazer isso no menu 'Produtos' ou 'Vendedor IA'.
-      Responda sempre em Português do Brasil.`;
+      const systemInstruction = CHAT_SYSTEM_INSTRUCTION;
 
       const stream = await aiService.generateChatResponseStream(
         history,
@@ -156,18 +144,26 @@ export const ChatIA: React.FC = () => {
         {messages.map((msg, idx) => (
           <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}>
             <div className={`max-w-[85%] md:max-w-[75%] flex flex-col gap-1.5 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-              <div className={`p-4 rounded-[16px] shadow-small text-body2 font-normal leading-relaxed ${msg.role === 'user'
+              <div className={`p-4 rounded-[16px] shadow-small text-body2 font-normal leading-relaxed overflow-hidden ${msg.role === 'user'
                 ? 'bg-primary-600 text-white rounded-tr-none'
-                : 'bg-white text-neutral-900 border border-neutral-200 rounded-tl-none'
+                : 'bg-white text-neutral-900 border border-neutral-200 rounded-tl-none prose prose-sm max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0 prose-strong:text-neutral-900'
                 }`}>
-                {msg.content ? msg.content.split('\n').map((line, i) => (
-                  <p key={i} className={i > 0 ? 'mt-2' : ''}>{line}</p>
-                )) : (
-                  <div className="flex gap-1.5 py-1">
-                    <div className="w-2 h-2 bg-neutral-300 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                    <div className="w-2 h-2 bg-neutral-300 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                    <div className="w-2 h-2 bg-neutral-300 rounded-full animate-bounce"></div>
-                  </div>
+                {msg.content ? (
+                  msg.role === 'user' ? (
+                    msg.content || ''
+                  ) : (
+                    <ReactMarkdown>
+                      {msg.content || ''}
+                    </ReactMarkdown>
+                  )
+                ) : (
+                  msg.isStreaming && (
+                    <div className="flex gap-1.5 py-1">
+                      <div className="w-2 h-2 bg-neutral-300 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                      <div className="w-2 h-2 bg-neutral-300 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                      <div className="w-2 h-2 bg-neutral-300 rounded-full animate-bounce"></div>
+                    </div>
+                  )
                 )}
               </div>
               <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider px-1">
