@@ -545,7 +545,12 @@ export const LeadCardModal: React.FC<LeadCardModalProps> = ({
                                 {/* WhatsApp */}
                                 <div className="flex items-center gap-4">
                                     <span className="text-[13px] font-medium text-[#686864] w-[80px] flex-none">WhatsApp</span>
-                                    <span className="text-[13px] font-semibold text-[#01040E]">{formatPhone(card.customerPhone)}</span>
+                                    <span
+                                        className="text-[13px] font-semibold text-[#01040E] hover:text-primary-600 cursor-pointer transition-colors"
+                                        onClick={() => window.open(`https://wa.me/${card.customerPhone.replace(/\D/g, '')}`, '_blank')}
+                                    >
+                                        {formatPhone(card.customerPhone)}
+                                    </span>
                                 </div>
 
                                 {/* Email */}
@@ -1011,25 +1016,28 @@ export const LeadCardModal: React.FC<LeadCardModalProps> = ({
                 onClose={() => setShowDeleteConfirm(false)}
                 title="Excluir Lead"
                 maxWidth="400px"
-                height="auto"
-            >
-                <div className="flex flex-col gap-4">
-                    <p className="text-body2 text-neutral-600">
-                        Tem certeza que deseja excluir este lead? O registro do cliente não será apagado, apenas este cartão do funil.
-                    </p>
-                    <div className="flex justify-end gap-2 pt-2">
-                        <Button
-                            variant="secondary"
-                            onClick={() => setShowDeleteConfirm(false)}
-                        >
-                            Cancelar
-                        </Button>
-                        <Button
-                            variant="danger"
-                            onClick={handleDeleteLead}
-                        >
+                footer={
+                    <div className="flex gap-3">
+                        <Button variant="secondary" className="flex-1 !h-[36px]" onClick={() => setShowDeleteConfirm(false)}>Cancelar</Button>
+                        <Button variant="danger" className="flex-1 !h-[36px] shadow-sm" onClick={handleDeleteLead}>
                             Excluir Lead
                         </Button>
+                    </div>
+                }
+            >
+                <div className="flex flex-col gap-4">
+                    <div className="flex flex-col items-center justify-center py-2">
+                        <div className="w-16 h-16 bg-system-error-50 rounded-full flex items-center justify-center text-system-error-500 mb-2 border border-system-error-100 shadow-sm">
+                            <i className="ph ph-trash ph-bold text-3xl"></i>
+                        </div>
+                    </div>
+                    <div className="flex flex-col gap-2 text-center">
+                        <p className="text-body2 font-bold text-neutral-black">
+                            Deseja excluir este lead?
+                        </p>
+                        <p className="text-small text-neutral-500 leading-relaxed">
+                            O registro do cliente não será apagado, apenas este cartão do funil. Esta operação não pode ser desfeita.
+                        </p>
                     </div>
                 </div>
             </Modal>
@@ -1040,25 +1048,28 @@ export const LeadCardModal: React.FC<LeadCardModalProps> = ({
                 onClose={() => setShowDeleteFileConfirm(false)}
                 title="Excluir Arquivo"
                 maxWidth="400px"
-                height="auto"
-            >
-                <div className="flex flex-col gap-4">
-                    <p className="text-body2 text-neutral-600">
-                        Tem certeza que deseja excluir o arquivo <strong>{fileToDelete?.name}</strong>? Esta ação não pode ser desfeita.
-                    </p>
-                    <div className="flex justify-end gap-2 pt-2">
-                        <Button
-                            variant="secondary"
-                            onClick={() => setShowDeleteFileConfirm(false)}
-                        >
-                            Cancelar
-                        </Button>
-                        <Button
-                            variant="danger"
-                            onClick={handleConfirmDeleteFile}
-                        >
+                footer={
+                    <div className="flex gap-3">
+                        <Button variant="secondary" className="flex-1 !h-[36px]" onClick={() => setShowDeleteFileConfirm(false)}>Cancelar</Button>
+                        <Button variant="danger" className="flex-1 !h-[36px] shadow-sm" onClick={handleConfirmDeleteFile}>
                             Excluir Arquivo
                         </Button>
+                    </div>
+                }
+            >
+                <div className="flex flex-col gap-4">
+                    <div className="flex flex-col items-center justify-center py-2">
+                        <div className="w-16 h-16 bg-system-error-50 rounded-full flex items-center justify-center text-system-error-500 mb-2 border border-system-error-100 shadow-sm">
+                            <i className="ph ph-trash ph-bold text-3xl"></i>
+                        </div>
+                    </div>
+                    <div className="flex flex-col gap-2 text-center">
+                        <p className="text-body2 font-bold text-neutral-black">
+                            Deseja excluir o arquivo "{fileToDelete?.name}"?
+                        </p>
+                        <p className="text-small text-neutral-500 leading-relaxed">
+                            Esta ação removerá permanentemente o arquivo. Esta operação não pode ser desfeita.
+                        </p>
                     </div>
                 </div>
             </Modal>
@@ -1069,25 +1080,28 @@ export const LeadCardModal: React.FC<LeadCardModalProps> = ({
                 onClose={() => setShowDeleteTaskConfirm(false)}
                 title="Excluir Tarefa"
                 maxWidth="400px"
-                height="auto"
-            >
-                <div className="flex flex-col gap-4">
-                    <p className="text-body2 text-neutral-600">
-                        Tem certeza que deseja excluir a tarefa <strong>{taskToDelete?.title}</strong>? Esta ação não pode ser desfeita.
-                    </p>
-                    <div className="flex justify-end gap-2 pt-2">
-                        <Button
-                            variant="secondary"
-                            onClick={() => setShowDeleteTaskConfirm(false)}
-                        >
-                            Cancelar
-                        </Button>
-                        <Button
-                            variant="danger"
-                            onClick={handleConfirmDeleteTask}
-                        >
+                footer={
+                    <div className="flex gap-3">
+                        <Button variant="secondary" className="flex-1 !h-[36px]" onClick={() => setShowDeleteTaskConfirm(false)}>Cancelar</Button>
+                        <Button variant="danger" className="flex-1 !h-[36px] shadow-sm" onClick={handleConfirmDeleteTask}>
                             Excluir Tarefa
                         </Button>
+                    </div>
+                }
+            >
+                <div className="flex flex-col gap-4">
+                    <div className="flex flex-col items-center justify-center py-2">
+                        <div className="w-16 h-16 bg-system-error-50 rounded-full flex items-center justify-center text-system-error-500 mb-2 border border-system-error-100 shadow-sm">
+                            <i className="ph ph-trash ph-bold text-3xl"></i>
+                        </div>
+                    </div>
+                    <div className="flex flex-col gap-2 text-center">
+                        <p className="text-body2 font-bold text-neutral-black">
+                            Deseja excluir a tarefa "{taskToDelete?.title}"?
+                        </p>
+                        <p className="text-small text-neutral-500 leading-relaxed">
+                            Esta ação removerá permanentemente a tarefa. Esta operação não pode ser desfeita.
+                        </p>
                     </div>
                 </div>
             </Modal>

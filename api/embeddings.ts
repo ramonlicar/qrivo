@@ -4,7 +4,6 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 });
 
-
 export const config = {
     runtime: 'edge',
 };
@@ -22,25 +21,26 @@ export default async function handler(req: Request) {
     }
 
     try {
-        const { prompt, systemInstruction } = await req.json();
+        const { text } = await req.json();
 
-        const messages = [];
-        if (systemInstruction) {
-            messages.push({ role: 'system', content: systemInstruction });
+        if (!text) {
+            return new Response(JSON.stringify({ error: 'Missing text' }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' },
+            });
         }
-        messages.push({ role: 'user', content: prompt });
 
-        const response = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            messages: messages as any,
-            temperature: 0.7,
+        const response = await openai.embeddings.create({
+            model: "text-embedding-3-small",
+            input: text,
+            encoding_format: "float",
         });
 
-        return new Response(JSON.stringify({ text: response.choices[0].message.content }), {
+        return new Response(JSON.stringify({ embedding: response.data[0].embedding }), {
             headers: { 'Content-Type': 'application/json' },
         });
     } catch (error: any) {
-        console.error('Error in generate API:', error);
+        console.error('Error in embeddings API:', error);
         return new Response(JSON.stringify({ error: error.message }), {
             status: 500,
             headers: { 'Content-Type': 'application/json' },

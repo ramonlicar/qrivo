@@ -396,7 +396,16 @@ export const LeadDetailsSidebar: React.FC<LeadDetailsSidebarProps> = ({
 
               {/* Container: Informações de Contato */}
               <section className="flex flex-col gap-4 p-4 border border-neutral-100 rounded-2xl bg-white shadow-small">
-                <h5 className="text-body1 font-bold text-neutral-black">Informações do contato</h5>
+                <div className="flex items-center justify-between">
+                  <h5 className="text-body1 font-bold text-neutral-black">Informações do contato</h5>
+                  <button
+                    onClick={() => window.open(`https://wa.me/${card.customerPhone.replace(/\D/g, '')}`, '_blank')}
+                    className="text-body2 font-medium text-emerald-600 hover:text-emerald-700 hover:underline flex items-center gap-1.5 transition-all"
+                  >
+                    <i className="ph ph-whatsapp-logo text-lg"></i>
+                    WhatsApp
+                  </button>
+                </div>
 
                 <div className="flex flex-col gap-5">
                   <div className="flex flex-col gap-1">

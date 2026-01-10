@@ -48,6 +48,7 @@ export interface Product {
   id: string;
   name: string;
   category: string;
+  categoryId?: string;
   price: number;
   availability: 'ATIVO' | 'INATIVO';
   image: string;
@@ -56,6 +57,8 @@ export interface Product {
   lastModified?: string;
   parentId?: string; // ID do produto pai, se for uma variação
   variantAttributes?: ProductAttribute[]; // Atributos que definem esta variação
+  variantCount?: number;
+  ref?: string;
 }
 
 export interface Customer {

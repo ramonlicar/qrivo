@@ -1,6 +1,7 @@
 
 import { supabase } from './supabase';
-import { CartItem } from '../types';
+import { CartItem, Product } from '../types';
+import { aiService } from './aiService';
 
 // --- Interfaces de Retorno ---
 export interface PaginatedResponse<T> {
@@ -597,7 +598,27 @@ export const customersService = {
       .single();
 
     return { data: data as CartItem, error };
-  }
+  },
+
+  async getSummary(companyId: string) {
+    const { data: topCustomers, error: topError } = await supabase
+      .from('customers_with_stats')
+      .select('name, total_spent, total_orders')
+      .eq('company_id', companyId)
+      .order('total_spent', { ascending: false })
+      .limit(5);
+
+    const { count: totalCustomers, error: countError } = await supabase
+      .from('customers')
+      .select('*', { count: 'exact', head: true })
+      .eq('company_id', companyId);
+
+    return {
+      totalCustomers: totalCustomers || 0,
+      topCustomers: topCustomers || [],
+      error: topError || countError
+    };
+  },
 };
 
 // --- Orders Service ---
@@ -616,6 +637,7 @@ export const ordersService = {
     return { data: data || [], count: count || 0, error };
   },
 
+
   async getOrdersByCustomer(companyId: string, customerId: string): Promise<PaginatedResponse<any>> {
     const { data, error, count } = await supabase
       .from('orders')
@@ -628,8 +650,66 @@ export const ordersService = {
       .order('created_at', { ascending: false });
 
     return { data: data || [], count: count || 0, error };
+  },
+
+  async getInsightsData(companyId: string) {
+    const { data: orders, error } = await supabase
+      .from('orders')
+      .select('code, customer_name, total, payment_status, order_status, created_at')
+      .eq('company_id', companyId);
+
+    if (error) return { error };
+
+    const paidOrders = orders.filter(o => o.payment_status?.toLowerCase() === 'paid' || o.payment_status === 'PAGO');
+    const totalRevenue = paidOrders.reduce((acc, curr) => acc + (Number(curr.total) || 0), 0);
+    const averageTicket = paidOrders.length > 0 ? totalRevenue / paidOrders.length : 0;
+
+    // Novos hoje
+    const today = new Date().toISOString().split('T')[0];
+    const newOrdersToday = orders.filter(o =>
+      (o.order_status?.toLowerCase() === 'new' || o.order_status === 'NOVO') &&
+      o.created_at.startsWith(today)
+    ).length;
+
+    const recentOrders = orders
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 5)
+      .map(o => ({
+        code: o.code,
+        customer: o.customer_name,
+        total: o.total,
+        status: o.order_status,
+        date: o.created_at
+      }));
+
+    return {
+      totalRevenue,
+      averageTicket,
+      totalOrders: orders.length,
+      paidOrdersCount: paidOrders.length,
+      newOrdersToday,
+      recentOrders
+    };
   }
 };
+
+export const businessService = {
+  async getCompanyOverview(companyId: string) {
+    const [customers, insights, products] = await Promise.all([
+      customersService.getSummary(companyId),
+      ordersService.getInsightsData(companyId),
+      productsService.getProducts(companyId, 1, 100)
+    ]);
+
+    return {
+      customers,
+      insights,
+      productsCount: products.count || 0,
+      recentProducts: products.data?.slice(0, 10) || []
+    };
+  }
+};
+
 
 // --- Team Service (formerly Profiles/Team) ---
 export const teamService = {
@@ -770,5 +850,430 @@ export const plansService = {
     // Note: 'plan:plans(*)' expands the relation if configured in Supabase. 
     // If FK is strictly defined, this works. Otherwise we might need a separate call.
     return { data: data as (Subscription & { plan: Plan }) | null, error };
+  }
+};
+
+// --- Products Service ---
+export const productsService = {
+  async getProducts(companyId: string, page = 1, pageSize = 12, filters?: { search?: string; category?: string; status?: string; sortBy?: 'A-Z' | 'Z-A' | 'PRICE_ASC' | 'PRICE_DESC' }): Promise<PaginatedResponse<Product>> {
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+
+    let query = supabase
+      .from('products')
+      .select('*, category:categories(id, name), variations:products!parent_id(count)', { count: 'exact' })
+      .eq('company_id', companyId);
+    // Removed fixed order('created_at') to allow dynamic sorting
+
+    if (filters?.search) {
+      query = query.ilike('name', `%${filters.search}%`);
+    }
+
+    // By default, only show main products (no variants)
+    query = query.is('parent_id', null);
+
+    if (filters?.category) {
+      query = query.eq('categories.name', filters.category);
+    }
+
+    if (filters?.status) {
+      const dbStatus = filters.status === 'ATIVO' ? 'active' : 'inactive';
+      query = query.eq('status', dbStatus);
+    }
+
+    // Sorting Logic
+    const sort = filters?.sortBy || 'A-Z';
+    switch (sort) {
+      case 'A-Z':
+        query = query.order('name', { ascending: true });
+        break;
+      case 'Z-A':
+        query = query.order('name', { ascending: false });
+        break;
+      case 'PRICE_ASC':
+        query = query.order('price', { ascending: true });
+        break;
+      case 'PRICE_DESC':
+        query = query.order('price', { ascending: false });
+        break;
+      default:
+        query = query.order('name', { ascending: true });
+    }
+
+    // Secondary sort for stability
+    if (sort !== 'A-Z' && sort !== 'Z-A') {
+      query = query.order('name', { ascending: true });
+    }
+
+    query = query.range(from, to);
+
+    const { data, error, count } = await query;
+
+    if (error) {
+      console.error("Error fetching products:", error);
+      return { data: [], count: 0, error };
+    }
+
+    const mappedData = data.map((item: any) => ({
+      id: item.id,
+      name: item.name,
+      category: item.category?.name || 'Sem Categoria',
+      categoryId: item.category?.id,
+      price: item.price,
+      availability: (item.status === 'active' ? 'ATIVO' : 'INATIVO') as 'ATIVO' | 'INATIVO',
+      image: item.image_url || '',
+      shortDescription: item.short_description,
+      longDescription: item.long_description || item.description,
+      lastModified: new Date(item.updated_at || item.created_at).toLocaleString('pt-BR'),
+      parentId: item.parent_id,
+      variantAttributes: item.variant_attributes,
+      variantCount: item.variations?.[0]?.count || 0,
+      ref: item.sku
+    }));
+
+    return { data: mappedData, count: count || 0, error: null };
+  },
+
+  async createProduct(companyId: string, product: any) {
+    const dbData = {
+      company_id: companyId,
+      name: product.name,
+      price: product.price,
+      status: product.availability === 'ATIVO' ? 'active' : 'inactive',
+      category_id: product.categoryId,
+      image_url: product.image,
+      short_description: product.shortDescription,
+      long_description: product.longDescription,
+      sku: product.ref
+    };
+
+    const { data, error } = await supabase
+      .from('products')
+      .insert(dbData)
+      .select()
+      .single();
+
+    if (!error && data) {
+      this.vectorizeProduct(data.id).catch(err => console.error('Erro na vetorização automática:', err));
+    }
+
+    return { data, error };
+  },
+
+  async updateProduct(productId: string, product: any) {
+    const dbData: any = {
+      name: product.name,
+      price: product.price,
+      status: product.availability === 'ATIVO' ? 'active' : 'inactive',
+      category_id: product.categoryId,
+      image_url: product.image,
+      short_description: product.shortDescription,
+      long_description: product.longDescription,
+      sku: product.ref,
+      updated_at: new Date().toISOString()
+    };
+
+    const { data, error } = await supabase
+      .from('products')
+      .update(dbData)
+      .eq('id', productId)
+      .select()
+      .single();
+
+    if (!error && data) {
+      this.vectorizeProduct(productId).catch(err => console.error('Erro na vetorização automática:', err));
+    }
+
+    return { data, error };
+  },
+
+  async deleteProduct(productId: string) {
+    const { error } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', productId);
+    return { error };
+  },
+
+  async getCategories(companyId: string) {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('id, name')
+      .eq('company_id', companyId)
+      .order('name');
+
+    if (error) return [];
+
+    return data;
+  },
+
+  async createCategory(companyId: string, name: string) {
+    const slug = name
+      .toLowerCase()
+      .trim()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove accents
+      .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric with -
+      .replace(/^-+|-+$/g, ''); // Trim leading/trailing -
+
+    const { data, error } = await supabase
+      .from('categories')
+      .insert([{ company_id: companyId, name: name, slug: slug }])
+      .select('id, name')
+      .single();
+    return { data, error };
+  },
+
+  async getCategoriesWithCount(companyId: string) {
+    const { data, error } = await supabase
+      .from('categories')
+      .select(`
+        id,
+        name,
+        products:products(count)
+      `)
+      .eq('company_id', companyId)
+      .order('name');
+
+    if (error) {
+      console.error("Error fetching categories with count:", error);
+      return [];
+    }
+
+    return data.map((cat: any) => ({
+      id: cat.id,
+      name: cat.name,
+      count: cat.products?.[0]?.count || 0
+    }));
+  },
+
+  async updateCategory(categoryId: string, name: string) {
+    const slug = name
+      .toLowerCase()
+      .trim()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+    const { data, error } = await supabase
+      .from('categories')
+      .update({ name, slug })
+      .eq('id', categoryId)
+      .select()
+      .single();
+
+    return { data, error };
+  },
+
+  async deleteCategory(categoryId: string) {
+    const { error } = await supabase
+      .from('categories')
+      .delete()
+      .eq('id', categoryId);
+
+    return { error };
+  },
+
+  async uploadImage(file: File) {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('products')
+      .upload(filePath, file);
+
+    if (uploadError) {
+      console.error('Upload Error:', uploadError);
+      throw uploadError;
+    }
+
+    const { data } = supabase.storage.from('products').getPublicUrl(filePath);
+    return data.publicUrl;
+  },
+
+  async getProductById(id: string) {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*, category:categories(id, name)')
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+
+    // Map immediately to consistent internal format if needed, or return raw
+    // Mapping here to be safe and consistent with getProducts
+    return {
+      id: data.id,
+      name: data.name,
+      category: data.category?.name || 'Sem Categoria',
+      categoryId: data.category?.id,
+      price: data.price,
+      availability: (data.status === 'active' ? 'ATIVO' : 'INATIVO') as 'ATIVO' | 'INATIVO',
+      image: data.image_url || '',
+      shortDescription: data.short_description,
+      longDescription: data.long_description || data.description,
+      lastModified: new Date(data.updated_at || data.created_at).toLocaleString('pt-BR'),
+      parentId: data.parent_id,
+      variantAttributes: data.variant_attributes,
+      ref: data.sku
+    };
+  },
+
+  async createVariants(productId: string, variants: { name: string; attributes: any[] }[]) {
+    // Buscar dados do produto pai
+    const { data: parent, error: fetchError } = await supabase
+      .from('products')
+      .select('*')
+      .eq('id', productId)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching parent product:', fetchError);
+      return { data: null, error: fetchError };
+    }
+
+    const variantsData = variants.map(v => ({
+      company_id: parent.company_id,
+      parent_id: productId,
+      name: v.name,
+      price: parent.price,
+      status: parent.status,
+      category_id: parent.category_id,
+      image_url: parent.image_url,
+      short_description: parent.short_description,
+      long_description: parent.long_description,
+      variant_attributes: v.attributes
+    }));
+
+    const { data, error } = await supabase
+      .from('products')
+      .insert(variantsData)
+      .select();
+
+    if (!error && data) {
+      data.forEach(v => {
+        this.vectorizeProduct(v.id).catch(err => console.error('Erro na vetorização automática de variante:', err));
+      });
+    }
+
+    return { data, error };
+  },
+
+  async getVariants(productId: string) {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*, category:categories(id, name)')
+      .eq('parent_id', productId)
+      .order('name');
+
+    if (error) {
+      console.error('Error fetching variants:', error);
+      return [];
+    }
+
+    return data.map((item: any) => ({
+      id: item.id,
+      name: item.name,
+      category: item.category?.name || 'Sem Categoria',
+      categoryId: item.category?.id,
+      price: item.price,
+      availability: (item.status === 'active' ? 'ATIVO' : 'INATIVO') as 'ATIVO' | 'INATIVO',
+      image: item.image_url || '',
+      shortDescription: item.short_description,
+      longDescription: item.long_description || item.description,
+      lastModified: new Date(item.updated_at || item.created_at).toLocaleString('pt-BR'),
+      parentId: item.parent_id,
+      variantAttributes: item.variant_attributes,
+      ref: item.sku
+    }));
+  },
+
+  async recommendProducts(embedding: number[], companyId: string, matchThreshold = 0.5, matchCount = 5) {
+    const { data: matches, error } = await supabase.rpc('match_products', {
+      query_embedding: embedding,
+      match_threshold: matchThreshold,
+      match_count: matchCount,
+      p_company_id: companyId
+    });
+
+    if (error || !matches || matches.length === 0) {
+      if (error) console.error('Error matching products:', error);
+      return [];
+    }
+
+    // Buscar os dados completos dos produtos correspondentes
+    const productIds = matches.map((m: any) => m.product_id);
+    const { data: products, error: productsError } = await supabase
+      .from('products')
+      .select('*, category:categories(name)')
+      .in('id', productIds);
+
+    if (productsError) {
+      console.error('Error fetching recommended products:', productsError);
+      return [];
+    }
+
+    // Mapear para o tipo Product do frontend
+    return products.map(item => ({
+      id: item.id,
+      name: item.name,
+      category: item.category?.name || 'Sem Categoria',
+      categoryId: item.category?.id,
+      price: item.price,
+      availability: (item.status === 'active' ? 'ATIVO' : 'INATIVO') as 'ATIVO' | 'INATIVO',
+      image: item.image_url || '',
+      shortDescription: item.short_description,
+      longDescription: item.long_description || item.description,
+      lastModified: new Date(item.updated_at || item.created_at).toLocaleString('pt-BR'),
+      parentId: item.parent_id,
+      variantAttributes: item.variant_attributes,
+      ref: item.sku
+    }));
+  },
+
+  async vectorizeProduct(productId: string) {
+    console.log('[RAG] Iniciando vetorização do produto:', productId);
+    try {
+      // 1. Buscar dados completos do produto (incluindo categoria)
+      const { data: product, error: fetchError } = await supabase
+        .from('products')
+        .select('*, category:categories(name)')
+        .eq('id', productId)
+        .single();
+
+      if (fetchError || !product) throw fetchError || new Error('Produto não encontrado');
+
+      // 2. Montar string de contexto
+      const context = `
+        Produto: ${product.name}
+        Categoria: ${product.category?.name || 'Sem Categoria'}
+        Preço: R$ ${product.price}
+        Ref/SKU: ${product.sku || 'N/A'}
+        Desc Curta: ${product.short_description || ''}
+        Desc Longa: ${product.long_description || product.description || ''}
+      `.trim().replace(/\s+/g, ' ');
+
+      // 3. Gerar embedding
+      const embedding = await aiService.generateEmbedding(context);
+
+      // 4. Salvar na tabela de embeddings
+      const { error: upsertError } = await supabase
+        .from('product_embeddings')
+        .upsert({
+          product_id: product.id,
+          company_id: product.company_id,
+          content: context,
+          embedding: embedding,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'product_id' });
+
+      if (upsertError) throw upsertError;
+
+      console.log(`[RAG] Sucesso: Produto "${product.name}" vetorizado.`);
+    } catch (error) {
+      console.error('[RAG] Falha na vetorização:', error);
+    }
   }
 };

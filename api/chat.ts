@@ -4,6 +4,11 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 });
 
+
+export const config = {
+    runtime: 'edge',
+};
+
 export default async function handler(req: Request) {
     if (req.method !== 'POST') {
         return new Response('Method Not Allowed', { status: 405 });

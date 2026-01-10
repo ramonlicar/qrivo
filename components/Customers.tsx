@@ -353,7 +353,8 @@ export const Customers: React.FC = () => {
 
 
   // Grid responsiva: esconde colunas em telas menores para evitar scroll horizontal
-  const tableGridClass = "grid grid-cols-[1fr_80px_80px] sm:grid-cols-[1fr_120px_140px_80px_80px] lg:grid-cols-[1fr_120px_160px_140px_160px_100px_90px] items-center px-4 sm:px-6 gap-3 sm:gap-4";
+  // Grid responsiva: esconde colunas em telas menores para evitar scroll horizontal
+  const tableGridClass = "grid grid-cols-[1fr_80px_80px] sm:grid-cols-[1fr_140px_120px_80px_80px] lg:grid-cols-[1fr_140px_120px_160px_100px_90px] items-center px-4 sm:px-6 gap-3 sm:gap-4";
 
   return (
     <div className="flex flex-col w-full h-full bg-white animate-in fade-in duration-500 overflow-hidden relative">
@@ -449,9 +450,8 @@ export const Customers: React.FC = () => {
               {/* Table Header */}
               <div className={`${tableGridClass} h-[40px] bg-secondary-700 sticky top-0 z-20`}>
                 <span className="text-[13px] font-semibold text-white">Cliente</span>
+                <span className="hidden sm:block text-[13px] font-semibold text-white">Etiquetas</span>
                 <span className="hidden sm:block text-[13px] font-semibold text-white">Valor Gasto</span>
-                <span className="hidden sm:block text-[13px] font-semibold text-white">WhatsApp</span>
-                <span className="hidden lg:block text-[13px] font-semibold text-white">Etiquetas</span>
                 <span className="hidden lg:block text-[13px] font-semibold text-white">Cadastrado em</span>
                 <span className="text-[13px] font-semibold text-white text-center">Agente IA</span>
                 <span></span>
@@ -485,28 +485,13 @@ export const Customers: React.FC = () => {
                             {customer.name}
                           </span>
                           <span className="text-[11px] font-medium text-neutral-400 truncate">
-                            {customer.email}
+                            {customer.phone.replace(/^(\d{2})(\d{2})(\d{5})(\d{4})$/, '+$1 ($2) $3-$4')}
                           </span>
                         </div>
                       </div>
 
-                      {/* Valor Gasto Col (Hidden on mobile) */}
-                      <div className="hidden sm:flex items-center gap-1 overflow-hidden">
-                        <span className="text-body2 font-bold text-neutral-black tabular-nums truncate">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(customer.totalSpent || 0)}
-                        </span>
-                      </div>
-
-                      {/* WhatsApp Col (Hidden on mobile) */}
-                      <div className="hidden sm:flex items-center gap-2 overflow-hidden">
-                        <i className="ph ph-whatsapp-logo text-emerald-500 text-lg flex-none"></i>
-                        <span className="text-body2 font-bold text-neutral-900 tabular-nums truncate">
-                          {customer.phone.replace(/^(\d{2})(\d{2})(\d{5})(\d{4})$/, '+$1 ($2) $3-$4')}
-                        </span>
-                      </div>
-
-                      {/* Etiquetas Col (Hidden on tablets/mobile) */}
-                      <div className="hidden lg:flex flex-wrap gap-1 overflow-hidden">
+                      {/* Etiquetas Col (Moved to left of Spent) */}
+                      <div className="hidden sm:flex flex-wrap gap-1 overflow-hidden">
                         {(customer.tags || []).slice(0, 2).map((tag, i) => (
                           <span key={i} className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded text-white ${tag.color || 'bg-emerald-500'} shadow-sm truncate max-w-full`}>
                             {tag.text}
@@ -516,6 +501,14 @@ export const Customers: React.FC = () => {
                           <span className="text-[9px] text-neutral-400 font-bold">+{(customer.tags || []).length - 2}</span>
                         )}
                       </div>
+
+                      {/* Valor Gasto Col */}
+                      <div className="hidden sm:flex items-center gap-1 overflow-hidden">
+                        <span className="text-body2 font-bold text-neutral-black tabular-nums truncate">
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(customer.totalSpent || 0)}
+                        </span>
+                      </div>
+
 
                       {/* Data Col (Hidden on tablets/mobile) */}
                       <div className="hidden lg:flex flex-col items-start overflow-hidden">
@@ -596,8 +589,10 @@ export const Customers: React.FC = () => {
         }
       >
         <div className="flex flex-col gap-4">
-          <div className="w-12 h-12 rounded-full bg-system-error-50 flex items-center justify-center text-system-error-500 mx-auto">
-            <i className="ph ph-warning-circle-bold text-3xl"></i>
+          <div className="flex flex-col items-center justify-center py-2">
+            <div className="w-16 h-16 bg-system-error-50 rounded-full flex items-center justify-center text-system-error-500 mb-2 border border-system-error-100 shadow-sm">
+              <i className="ph ph-trash ph-bold text-3xl"></i>
+            </div>
           </div>
           <div className="flex flex-col gap-2 text-center">
             <p className="text-body2 font-bold text-neutral-black">

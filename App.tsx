@@ -43,7 +43,7 @@ const App: React.FC = () => {
   const [isResetPasswordMode, setIsResetPasswordMode] = useState(false);
   const [forceShowAuth, setForceShowAuth] = useState(false);
 
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(window.innerWidth < 1200);
   const [userProfile, setUserProfile] = useState({ name: '', avatar_url: '' });
   const [userStats, setUserStats] = useState({ plan: '...', used: 0, total: 0 });
 
@@ -61,6 +61,16 @@ const App: React.FC = () => {
       // Clear URL to prevent re-processing on refresh
       window.history.replaceState({}, document.title, window.location.pathname);
     }
+
+    // Responsive Sidebar Logic
+    const handleResize = () => {
+      if (window.innerWidth < 1200) {
+        setIsSidebarCollapsed(true);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -291,19 +301,19 @@ const App: React.FC = () => {
                 <Route path="/produtos" element={
                   <Products
                     onViewDetails={(p) => { setSelectedProductForView(p); navigate('/produtos/detalhes'); }}
-                    onEdit={(p) => { setEditingProduct(p); navigate('/produtos/editar'); }}
-                    onAddNew={() => { setEditingProduct(null); navigate('/produtos/novo'); }}
+                    onEdit={(p) => navigate(`/produtos/editar/${p.id}`)}
+                    onAddNew={() => navigate('/produtos/novo')}
                   />
                 } />
 
                 <Route path="/produtos/detalhes" element={
                   selectedProductForView ? (
-                    <ProductDetails product={selectedProductForView} onBack={() => navigate('/produtos')} onEdit={(p) => { setEditingProduct(p); navigate('/produtos/editar'); }} onDelete={() => navigate('/produtos')} />
+                    <ProductDetails product={selectedProductForView} onBack={() => navigate('/produtos')} onEdit={(p) => navigate(`/produtos/editar/${p.id}`)} onDelete={() => navigate('/produtos')} />
                   ) : <Navigate to="/produtos" />
                 } />
 
-                <Route path="/produtos/novo" element={<ProductFormPage product={null} onBack={() => navigate('/produtos')} onSave={() => navigate('/produtos')} />} />
-                <Route path="/produtos/editar" element={<ProductFormPage product={editingProduct} onBack={() => navigate(selectedProductForView ? '/produtos/detalhes' : '/produtos')} onSave={() => navigate('/produtos')} />} />
+                <Route path="/produtos/novo" element={<ProductFormPage product={null} onBack={() => navigate('/produtos')} onSave={(p) => { setSelectedProductForView(p as Product); navigate('/produtos/detalhes'); }} />} />
+                <Route path="/produtos/editar/:id" element={<ProductFormPage product={editingProduct} onBack={() => navigate(selectedProductForView ? '/produtos/detalhes' : '/produtos')} onSave={(p) => { setSelectedProductForView(p as Product); navigate('/produtos/detalhes'); }} />} />
 
                 <Route path="/design-system" element={<DesignSystemPage />} />
 

@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { NAVIGATION_SECTIONS } from '../constants';
+import { SidebarTooltip } from './SidebarTooltip';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -59,7 +60,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       `}>
 
         {/* Top Section: Logo + Nav */}
-        <div className="flex flex-col items-center gap-[16px] w-full overflow-hidden">
+        <div className="flex flex-col items-center gap-[16px] w-full overflow-hidden flex-1 min-h-0">
           {/* Logo Container */}
           <div className={`py-4 w-full flex items-center transition-all ${isCollapsed ? 'justify-center px-0' : 'flex-row justify-between px-3'}`}>
             {isCollapsed ? (
@@ -97,12 +98,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </div>
 
+
           {/* Navigation Groups */}
-          <nav className={`w-full flex flex-col items-center overflow-y-auto no-scrollbar max-h-[calc(100vh-320px)] ${isCollapsed ? 'space-y-1' : 'space-y-6 mt-4'}`}>
+          <nav className={`w-full flex flex-col items-center overflow-y-auto no-scrollbar flex-1 ${isCollapsed ? 'space-y-1' : 'space-y-6 mt-4'}`}>
             {NAVIGATION_SECTIONS.map((section) => (
               <div key={section.title} className="w-full">
                 {!isCollapsed && (
-                  <h3 className="text-[10px] text-neutral-400 mb-2 px-3 uppercase font-black tracking-[0.1em] select-none truncate">
+                  <h3 className="text-[11px] text-neutral-400 mb-2 px-3 font-medium tracking-[0.02em] leading-[18px] select-none truncate uppercase">
                     {section.title}
                   </h3>
                 )}
@@ -111,29 +113,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     const isActive = activePath === item.path;
                     return (
                       <li key={item.label} className="w-full relative group/tooltip">
-                        <button
-                          onClick={(e) => handleNavClick(e, item.path)}
-                          className={`flex items-center rounded-lg transition-all group border ${isCollapsed ? 'justify-center w-10 h-10 mx-auto' : 'gap-3 px-3 h-8 w-full'
-                            } ${isActive
-                              ? 'bg-white shadow-small border-transparent'
-                              : 'border-transparent hover:bg-neutral-200'
-                            }`}
-                        >
-                          <i className={`ph ${item.icon} ${isActive ? 'ph-fill text-primary-600' : 'ph-bold text-neutral-500'} text-base group-hover:scale-110 transition-transform`}></i>
-                          {!isCollapsed && (
-                            <span className={`text-body2 leading-none font-semibold tracking-tight truncate ${isActive ? 'text-primary-600' : 'text-neutral-black'}`}>
-                              {item.label}
-                            </span>
-                          )}
-                        </button>
-
-                        {/* Tooltip Versão Comprimida */}
-                        {isCollapsed && (
-                          <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2.5 py-1.5 bg-neutral-900 text-white text-[11px] font-bold rounded-lg opacity-0 group-hover/tooltip:opacity-100 pointer-events-none transition-all duration-200 whitespace-nowrap z-[100] shadow-xl flex items-center gap-2">
-                            {item.label}
-                            <div className="absolute top-1/2 -left-1 -translate-y-1/2 border-4 border-transparent border-r-neutral-900"></div>
-                          </div>
-                        )}
+                        <SidebarTooltip label={item.label} active={isCollapsed}>
+                          <button
+                            onClick={(e) => handleNavClick(e, item.path)}
+                            className={`flex items-center rounded-lg transition-all group border ${isCollapsed ? 'justify-center w-10 h-10 mx-auto' : 'gap-3 px-3 h-8 w-full'
+                              } ${isActive
+                                ? 'bg-white shadow-small border-transparent'
+                                : 'border-transparent hover:bg-neutral-200'
+                              }`}
+                          >
+                            <i className={`ph ${item.icon} ${isActive ? 'ph-fill text-primary-600' : 'ph-bold text-neutral-500'} text-base group-hover:scale-110 transition-transform`}></i>
+                            {!isCollapsed && (
+                              <span className={`text-body2 leading-none font-semibold tracking-tight truncate ${isActive ? 'text-primary-600' : 'text-neutral-black'}`}>
+                                {item.label}
+                              </span>
+                            )}
+                          </button>
+                        </SidebarTooltip>
                       </li>
                     );
                   })}
@@ -145,55 +141,45 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Bottom Section: Profile & Plan Card */}
         <div className="w-full pt-4 border-t border-neutral-200 flex flex-col gap-3">
-          <button
-            onClick={() => onNavigate('/ajustes')}
-            className={`flex flex-col bg-white rounded-xl border border-neutral-200 shadow-small overflow-hidden transition-all text-left w-full hover:border-primary-300 hover:shadow-md active:scale-[0.98] group relative ${isCollapsed ? 'p-1.5 items-center w-10 h-10 mx-auto' : 'p-3'
-              }`}
-          >
-            <div className={`flex items-center gap-3 w-full ${isCollapsed ? 'justify-center' : ''}`}>
-              <div className={`rounded-lg bg-primary-500 flex-shrink-0 flex items-center justify-center text-white font-bold shadow-sm group-hover:scale-110 transition-transform overflow-hidden ${isCollapsed ? 'w-7 h-7 text-[10px]' : 'w-8 h-8 text-[12px]'}`}>
-                {userProfile.avatar_url ? (
-                  <img src={userProfile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-                ) : (
-                  <span>{userProfile.name.charAt(0).toUpperCase()}</span>
+          <SidebarTooltip label="Ajustes da Conta" active={isCollapsed}>
+            <button
+              onClick={() => onNavigate('/ajustes')}
+              className={`flex flex-col bg-white rounded-xl border border-neutral-200 shadow-small overflow-hidden transition-all text-left w-full hover:border-primary-300 hover:shadow-md active:scale-[0.98] group relative ${isCollapsed ? 'p-1.5 items-center w-10 h-10 mx-auto' : 'p-3'
+                }`}
+            >
+              <div className={`flex items-center gap-3 w-full ${isCollapsed ? 'justify-center' : ''}`}>
+                <div className={`rounded-lg bg-primary-500 flex-shrink-0 flex items-center justify-center text-white font-bold shadow-sm group-hover:scale-110 transition-transform overflow-hidden ${isCollapsed ? 'w-7 h-7 text-[10px]' : 'w-8 h-8 text-[12px]'}`}>
+                  {userProfile.avatar_url ? (
+                    <img src={userProfile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    <span>{userProfile.name.charAt(0).toUpperCase()}</span>
+                  )}
+                </div>
+                {!isCollapsed && (
+                  <div className="flex flex-col items-start flex-1 min-w-0">
+                    <span className="text-body2 font-semibold text-neutral-black leading-tight truncate w-full group-hover:text-primary-600 transition-colors">
+                      {userProfile.name}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <i className="ph ph-crown-simple ph-fill text-[10px] text-amber-500"></i>
+                      <span className="text-[10px] font-black text-neutral-400 uppercase tracking-tight">{userStats.plan}</span>
+                    </div>
+                  </div>
                 )}
               </div>
-              {!isCollapsed && (
-                <div className="flex flex-col items-start flex-1 min-w-0">
-                  <span className="text-body2 font-semibold text-neutral-black leading-tight truncate w-full group-hover:text-primary-600 transition-colors">
-                    {userProfile.name}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <i className="ph ph-crown-simple ph-fill text-[10px] text-amber-500"></i>
-                    <span className="text-[10px] font-black text-neutral-400 uppercase tracking-tight">{userStats.plan}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-
-
-            {/* Tooltip Perfil Comprimido */}
-            {isCollapsed && (
-              <div className="absolute left-full top-1/2 -translate-y-1/2 ml-4 px-2.5 py-1.5 bg-neutral-900 text-white text-[11px] font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 whitespace-nowrap z-[100] shadow-xl">
-                Ajustes da Conta
-                <div className="absolute top-1/2 -left-1 -translate-y-1/2 border-4 border-transparent border-r-neutral-900"></div>
-              </div>
-            )}
-          </button>
+            </button>
+          </SidebarTooltip>
 
           {isCollapsed && (
-            <button
-              onClick={onToggleCollapse}
-              className="hidden lg:flex items-center justify-center w-10 h-10 text-neutral-400 hover:text-neutral-900 transition-all mx-auto group bg-white border border-neutral-200 rounded-xl shadow-small relative"
-              title="Expandir"
-            >
-              <i className="ph ph-caret-double-right text-[18px] group-hover:scale-110"></i>
-              <div className="absolute left-full top-1/2 -translate-y-1/2 ml-4 px-2.5 py-1.5 bg-neutral-900 text-white text-[11px] font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 whitespace-nowrap z-[100] shadow-xl">
-                Expandir Menu
-                <div className="absolute top-1/2 -left-1 -translate-y-1/2 border-4 border-transparent border-r-neutral-900"></div>
-              </div>
-            </button>
+            <SidebarTooltip label="Expandir Menu" active={isCollapsed}>
+              <button
+                onClick={onToggleCollapse}
+                className="hidden lg:flex items-center justify-center w-10 h-10 text-neutral-400 hover:text-neutral-900 transition-all mx-auto group bg-white border border-neutral-200 rounded-xl shadow-small relative"
+                title="Expandir"
+              >
+                <i className="ph ph-caret-double-right text-[18px] group-hover:scale-110"></i>
+              </button>
+            </SidebarTooltip>
           )}
         </div>
       </aside>
