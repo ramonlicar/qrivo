@@ -4,13 +4,16 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 });
 
-export const config = {
-    runtime: 'edge',
-};
-
 export default async function handler(req: Request) {
     if (req.method !== 'POST') {
         return new Response('Method Not Allowed', { status: 405 });
+    }
+
+    if (!process.env.OPENAI_API_KEY) {
+        return new Response(JSON.stringify({ error: 'Missing OPENAI_API_KEY' }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' },
+        });
     }
 
     try {
