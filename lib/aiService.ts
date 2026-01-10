@@ -1,16 +1,3 @@
-import OpenAI from "openai";
-
-const API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
-
-if (!API_KEY) {
-    console.warn("VITE_OPENAI_API_KEY não encontrada no arquivo .env");
-}
-
-const openai = new OpenAI({
-    apiKey: API_KEY || "",
-    dangerouslyAllowBrowser: true
-});
-
 export interface ChatMessage {
     role: 'user' | 'model';
     parts: { text: string }[];
@@ -18,15 +5,16 @@ export interface ChatMessage {
 
 export const aiService = {
     /**
-     * Gera uma resposta em stream para um chat
+     * Gera uma resposta de chat em streaming usando a API Backend (segura).
      */
     async *generateChatResponseStream(
         history: ChatMessage[],
         userMessageText: string,
         systemInstruction: string
-    ) {
+    ): AsyncGenerator<{ text: string }> {
         try {
-            const messages: any[] = history.map(msg => ({
+            // Converte o histórico para o formato da OpenAI
+            const messages = history.map(msg => ({
                 role: msg.role === 'model' ? 'assistant' : 'user',
                 content: msg.parts[0].text
             }));
@@ -37,56 +25,55 @@ export const aiService = {
 
             messages.push({ role: 'user', content: userMessageText });
 
-            const stream = await openai.chat.completions.create({
-                model: "gpt-4o-mini",
-                messages: messages,
-                stream: true,
-                temperature: 0.7,
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ messages }),
             });
 
-            for await (const chunk of stream) {
-                const content = chunk.choices[0]?.delta?.content || "";
-                if (content) {
-                    yield { text: content };
-                }
+            if (!response.body) throw new Error("No response body");
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value);
+                yield { text: chunk };
             }
+
         } catch (error: any) {
             console.error("Erro no aiService.generateChatResponseStream:", error);
-
-            // Tratamento de erro específico para 429 (Resource Exhausted / Rate Limit)
-            if (error?.status === 429 || error?.code === 'insufficient_quota') {
+            if (error?.status === 429 || error?.message?.includes('429')) {
                 throw new Error("LIMIT_EXCEEDED");
             }
-
             throw error;
         }
     },
 
     /**
-     * Gera conteúdo (não-stream) para uma solicitação simples
+     * Gera conteúdo de texto único (não-streaming) usando a API Backend.
      */
     async generateContent(prompt: string, systemInstruction?: string) {
         try {
-            const messages: any[] = [];
-
-            if (systemInstruction) {
-                messages.push({ role: 'system', content: systemInstruction });
-            }
-
-            messages.push({ role: 'user', content: prompt });
-
-            const response = await openai.chat.completions.create({
-                model: "gpt-4o-mini",
-                messages: messages,
-                temperature: 0.7,
+            const response = await fetch('/api/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt, systemInstruction }),
             });
 
-            return response.choices[0].message.content;
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || response.statusText);
+            }
+
+            const data = await response.json();
+            return data.text;
+
         } catch (error: any) {
             console.error("Erro no aiService.generateContent:", error);
-
-            // Tratamento de erro específico para 429
-            if (error?.status === 429 || error?.code === 'insufficient_quota') {
+            if (error?.status === 429 || error?.message?.includes('429')) {
                 throw new Error("LIMIT_EXCEEDED");
             }
             throw error;
