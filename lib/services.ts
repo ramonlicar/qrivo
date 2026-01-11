@@ -663,8 +663,18 @@ export const ordersService = {
   async getOrderById(orderId: string): Promise<{ data: any; error: any }> {
     const { data, error } = await supabase
       .from('orders')
-      .select('*, items:order_items(*)')
+      .select('id, company_id, code, order_status, total, subtotal, shipping_fee, order_summary, created_at, updated_at, company:companies(name, cnpj), items:order_items(*)')
       .eq('id', orderId)
+      .maybeSingle();
+
+    return { data: data || null, error };
+  },
+
+  async getOrderByCode(code: string): Promise<{ data: any; error: any }> {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('id, company_id, code, order_status, total, subtotal, shipping_fee, order_summary, created_at, updated_at, company:companies(name, cnpj), items:order_items(*)')
+      .ilike('code', code)
       .maybeSingle();
 
     return { data: data || null, error };

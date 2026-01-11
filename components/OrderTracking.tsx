@@ -1,9 +1,12 @@
 
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { ordersService, supabase } from '../lib/services';
 import { Order, OrderActivity } from '../types';
 import { Badge } from './Badge';
+import { Button } from './Button';
+import { TextInput } from './TextInput';
+import { formatCNPJ } from '../lib/utils';
 
 const ORDER_STATUS_MAP: Record<string, { label: string; variant: 'error' | 'success' | 'warning' | 'neutral' | 'purple' }> = {
     'new': { label: 'Novo', variant: 'error' },
@@ -23,18 +26,21 @@ const ORDER_STATUS_MAP: Record<string, { label: string; variant: 'error' | 'succ
 };
 
 export const OrderTracking: React.FC = () => {
-    const { id } = useParams<{ id: string }>();
+    const { code } = useParams<{ code: string }>();
     const [order, setOrder] = useState<Order | null>(null);
     const [history, setHistory] = useState<OrderActivity[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [searchCode, setSearchCode] = useState('');
+    const navigate = useNavigate();
 
     useEffect(() => {
         const fetchOrderData = async () => {
-            if (!id) return;
+            if (!code) return;
             setIsLoading(true);
+            setError(null);
             try {
-                const { data: orderData, error: orderError } = await ordersService.getOrderById(id);
+                const { data: orderData, error: orderError } = await ordersService.getOrderByCode(code);
                 console.log('[OrderTracking] Fetch order result:', { data: orderData, error: orderError });
                 if (orderError || !orderData) {
                     console.error('[OrderTracking] Order not found or error:', orderError);
@@ -42,10 +48,38 @@ export const OrderTracking: React.FC = () => {
                 }
                 setOrder(orderData);
 
-                console.log('[OrderTracking] Attempting to fetch order history for order ID:', id);
-                const { data: historyData, error: historyError } = await ordersService.getOrderHistory(id);
+                const orderId = orderData.id;
+                console.log('[OrderTracking] Attempting to fetch order history for order ID:', orderId);
+                const { data: historyData, error: historyError } = await ordersService.getOrderHistory(orderId);
                 console.log('[OrderTracking] Fetch history result:', { data: historyData, error: historyError });
                 setHistory(historyData || []);
+
+                // Setup real-time subscription inside the success block to ensure we have the ID
+                console.log('[OrderTracking] Setting up real-time subscription for order ID:', orderId);
+                const channel = supabase
+                    .channel(`order-tracking-${orderId}`)
+                    .on(
+                        'postgres_changes',
+                        { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` },
+                        (payload) => {
+                            console.log('[OrderTracking] Real-time Order Update:', payload);
+                            setOrder(prev => prev ? { ...prev, ...(payload.new as Order) } : (payload.new as Order));
+                        }
+                    )
+                    .on(
+                        'postgres_changes',
+                        { event: 'INSERT', schema: 'public', table: 'order_history', filter: `order_id=eq.${orderId}` },
+                        (payload) => {
+                            console.log('[OrderTracking] Real-time History Insert:', payload);
+                            setHistory(prev => [payload.new as OrderActivity, ...prev]);
+                        }
+                    )
+                    .subscribe();
+
+                return () => {
+                    console.log('[OrderTracking] Cleaning up real-time subscription for order ID:', orderId);
+                    supabase.removeChannel(channel);
+                };
             } catch (err: any) {
                 console.error('[OrderTracking] Error during data fetch:', err);
                 setError(err.message);
@@ -55,43 +89,67 @@ export const OrderTracking: React.FC = () => {
             }
         };
 
-        fetchOrderData();
-
-        // Real-time subscription
-        if (!id) return;
-        console.log('[OrderTracking] Setting up real-time subscription for order ID:', id);
-        const channel = supabase
-            .channel(`order-tracking-${id}`)
-            .on(
-                'postgres_changes',
-                { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${id}` },
-                (payload) => {
-                    console.log('[OrderTracking] Real-time Order Update:', payload);
-                    setOrder(prev => prev ? { ...prev, ...(payload.new as Order) } : (payload.new as Order));
-                }
-            )
-            .on(
-                'postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'order_history', filter: `order_id=eq.${id}` },
-                (payload) => {
-                    console.log('[OrderTracking] Real-time History Insert:', payload);
-                    setHistory(prev => [payload.new as OrderActivity, ...prev]);
-                }
-            )
-            .subscribe();
-        console.log('[OrderTracking] Real-time subscription established.');
-
+        const cleanup = fetchOrderData();
         return () => {
-            console.log('[OrderTracking] Cleaning up real-time subscription for order ID:', id);
-            supabase.removeChannel(channel);
+            cleanup.then(unsub => unsub && (typeof unsub === 'function') && unsub());
         };
-    }, [id]);
+    }, [code]);
+
+    const handleSearch = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (searchCode.trim()) {
+            navigate(`/rastreio/${searchCode.trim()}`);
+        }
+    };
+
+    if (!code) {
+        return (
+            <div className="min-h-screen bg-neutral-50 font-sans p-4 sm:p-6 lg:p-10 flex flex-col items-center overflow-y-auto">
+                <div className="w-full max-w-[480px] flex flex-col gap-10 mt-12 sm:mt-20">
+                    <div className="flex flex-col items-center gap-6">
+                        <img
+                            src="https://0e65cb6695ddeca8cb391ef6f8f9b815.cdn.bubble.io/f1759800667234x298580053943223740/logo%20qrivo%20ia.svg"
+                            alt="Qrivo.IA"
+                            className="h-12 w-auto"
+                        />
+                        <div className="flex flex-col items-center gap-2 text-center">
+                            <h1 className="text-2xl font-bold text-neutral-900 tracking-tight">Acompanhe seu pedido</h1>
+                            <p className="text-body2 text-neutral-500 font-medium">Digite o código do pedido para ver o status da entrega.</p>
+                        </div>
+                    </div>
+
+                    <form onSubmit={handleSearch} className="bg-white border border-neutral-200 rounded-2xl p-6 shadow-cards flex flex-col gap-4">
+                        <div className="flex flex-col gap-2">
+                            <label className="text-body2 font-bold text-neutral-900">Código do Pedido</label>
+                            <TextInput
+                                value={searchCode}
+                                onChange={(e) => setSearchCode(e.target.value)}
+                                placeholder="Ex: QR-1234"
+                                leftIcon="ph-hash"
+                                autoFocus
+                            />
+                        </div>
+                        <Button variant="primary" className="!h-[40px] w-full font-bold text-body2 shadow-sm" type="submit">
+                            Rastrear Pedido
+                        </Button>
+                    </form>
+
+                    {/* Simple Footer */}
+                    <div className="flex flex-col items-center gap-4 py-10 opacity-60">
+                        <p className="text-tag text-neutral-400 font-bold tracking-widest text-center">
+                            Sistema de vendas com IA desenvolvido por qrivo.ia
+                        </p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     if (isLoading) {
         return (
             <div className="min-h-screen bg-neutral-25 flex flex-col items-center justify-center p-6 gap-4 font-sans">
                 <i className="ph ph-circle-notch animate-spin text-4xl text-primary-500"></i>
-                <span className="text-tag font-bold text-neutral-400 uppercase tracking-widest">Localizando pedido...</span>
+                <span className="text-tag font-bold text-neutral-400 tracking-widest">Localizando pedido...</span>
             </div>
         );
     }
@@ -128,12 +186,16 @@ export const OrderTracking: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-neutral-50 font-sans p-4 sm:p-6 lg:p-10 flex flex-col items-center overflow-y-auto">
-            <div className="w-full max-w-3xl flex flex-col gap-8">
+            <div className="w-full max-w-[660px] flex flex-col gap-8">
 
                 {/* Header/Logo */}
                 <div className="flex flex-col items-center gap-2 mb-2">
-                    <div className="w-12 h-12 bg-primary-500 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/20">
-                        <i className="ph-bold ph-package text-white text-2xl"></i>
+                    <div className="w-12 h-12 bg-primary-500 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/20 overflow-hidden">
+                        <img
+                            src="https://0e65cb6695ddeca8cb391ef6f8f9b815.cdn.bubble.io/f1766623374427x261268037475739240/Qrivo%20S%C3%ADmbolo.svg"
+                            alt="Qrivo"
+                            className="w-8 h-8 pointer-events-none select-none"
+                        />
                     </div>
                     <h1 className="text-h3 font-bold text-neutral-900">Acompanhamento de Pedido</h1>
                     <p className="text-body2 text-neutral-500 font-medium tracking-tight">Código do Pedido: <span className="text-neutral-900 font-bold uppercase">{order.code}</span></p>
@@ -173,102 +235,49 @@ export const OrderTracking: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Main Content Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
+                {/* Main Content Vertical Flow - Single Column Mobile First */}
+                <div className="flex flex-col gap-6">
                     {/* Summary */}
-                    <div className="flex flex-col gap-6">
-                        <div className="bg-white border border-neutral-200 rounded-2xl p-6 shadow-sm flex flex-col gap-6 h-full">
-                            <h5 className="text-h5 font-bold text-neutral-black">Resumo do Pedido</h5>
+                    <div className="bg-white border border-neutral-200 rounded-2xl p-6 shadow-sm flex flex-col gap-6 w-full">
+                        <h5 className="text-h5 font-bold text-neutral-black">Resumo do Pedido</h5>
 
-                            <div className="flex flex-col gap-4">
-                                {(order.items || []).map((item, idx) => (
-                                    <div key={idx} className="flex justify-between items-center py-2 border-b border-neutral-50 last:border-none">
-                                        <div className="flex flex-col">
-                                            <span className="text-body2 font-bold text-neutral-900">{item.quantity}x {item.name_snapshot}</span>
-                                        </div>
-                                        <span className="text-body2 font-bold text-neutral-900">
-                                            {(item.price_snapshot * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                        </span>
+                        <div className="flex flex-col gap-4">
+                            {(order.items || []).map((item, idx) => (
+                                <div key={idx} className="flex justify-between items-center py-2 border-b border-neutral-50 last:border-none">
+                                    <div className="flex flex-col">
+                                        <span className="text-body2 font-bold text-neutral-900">{item.quantity}x {item.name_snapshot}</span>
                                     </div>
-                                ))}
-                            </div>
+                                    <span className="text-body2 font-bold text-neutral-900">
+                                        {(item.price_snapshot * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
 
-                            <div className="mt-auto pt-6 border-t border-neutral-100 flex flex-col gap-2">
-                                <div className="flex justify-between items-center text-body2 text-neutral-500 font-medium">
-                                    <span>Subtotal</span>
-                                    <span>{order.subtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                                </div>
-                                <div className="flex justify-between items-center text-body2 text-neutral-500 font-medium">
-                                    <span>Taxa de Entrega</span>
-                                    <span className="text-primary-600">{order.shipping_fee === 0 ? 'Grátis' : order.shipping_fee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                                </div>
-                                <div className="flex justify-between items-center text-h4 font-bold text-neutral-900 mt-2">
-                                    <span>Total</span>
-                                    <span>{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                                </div>
+                        <div className="mt-auto pt-6 border-t border-neutral-100 flex flex-col gap-2">
+                            <div className="flex justify-between items-center text-body2 text-neutral-500 font-medium">
+                                <span>Subtotal</span>
+                                <span>{order.subtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-body2 text-neutral-500 font-medium">
+                                <span>Taxa de Entrega</span>
+                                <span className="text-primary-600">{order.shipping_fee === 0 ? 'Grátis' : order.shipping_fee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-h4 font-bold text-neutral-900 mt-2">
+                                <span>Total</span>
+                                <span>{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                             </div>
                         </div>
                     </div>
 
-                    {/* Customer & Delivery */}
-                    <div className="flex flex-col gap-6">
-                        <div className="bg-white border border-neutral-200 rounded-2xl p-6 shadow-sm flex flex-col gap-6">
-                            <h5 className="text-h5 font-bold text-neutral-black">Informações de Entrega</h5>
-
-                            <div className="flex flex-col gap-6">
-                                <div className="flex items-start gap-4">
-                                    <div className="w-10 h-10 rounded-xl bg-neutral-50 border border-neutral-100 flex items-center justify-center flex-none">
-                                        <i className="ph-bold ph-user text-neutral-900 text-xl"></i>
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Cliente</span>
-                                        <p className="text-body2 font-bold text-neutral-900">{order.customer_name}</p>
-                                        <p className="text-[12px] text-neutral-500 mt-0.5">{order.customer_phone}</p>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-start gap-4">
-                                    <div className="w-10 h-10 rounded-xl bg-neutral-50 border border-neutral-100 flex items-center justify-center flex-none">
-                                        <i className="ph-bold ph-map-pin text-neutral-900 text-xl"></i>
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Endereço</span>
-                                        {order.shipping_address ? (
-                                            <p className="text-body2 font-medium text-neutral-700 leading-snug">
-                                                {order.shipping_address.street}, {order.shipping_address.number}<br />
-                                                {order.shipping_address.city} - {order.shipping_address.state}
-                                            </p>
-                                        ) : (
-                                            <p className="text-body2 font-medium text-neutral-400">Não informado</p>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {order.observations && (
-                                    <div className="p-4 bg-neutral-25 rounded-xl border border-neutral-100">
-                                        <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block mb-2">Observações</span>
-                                        <p className="text-[12px] text-neutral-600 italic">"{order.observations}"</p>
-                                    </div>
-                                )}
+                    {order.observations && (
+                        <div className="bg-white border border-neutral-200 rounded-2xl p-6 shadow-sm">
+                            <h5 className="text-h5 font-bold text-neutral-black mb-4">Observações do Pedido</h5>
+                            <div className="p-4 bg-neutral-25 rounded-xl border border-neutral-100 italic text-[14px] text-neutral-600 leading-relaxed">
+                                "{order.observations}"
                             </div>
                         </div>
-
-                        {/* Qrivo branding seal */}
-                        <div className="bg-primary-50 rounded-2xl p-6 border border-primary-100 flex items-center justify-between gap-4">
-                            <div className="flex flex-col gap-1">
-                                <div className="flex items-center gap-2">
-                                    <i className="ph-bold ph-sparkle text-primary-500"></i>
-                                    <span className="text-body2 font-bold text-primary-900">Atendimento IA Ativo</span>
-                                </div>
-                                <p className="text-[12px] text-primary-700 font-medium">Este pedido foi processado com inteligência artificial.</p>
-                            </div>
-                            <div className="flex flex-col items-end flex-none">
-                                <span className="text-[10px] text-primary-400 font-bold uppercase tracking-widest leading-none mb-1">Tecnologia</span>
-                                <span className="text-body2 font-black text-primary-600 tracking-tight">QRIVO</span>
-                            </div>
-                        </div>
-                    </div>
+                    )}
                 </div>
 
                 {/* History Timeline */}
@@ -303,7 +312,7 @@ export const OrderTracking: React.FC = () => {
                                             <i className={`ph ${config.icon} text-[10px] text-white`}></i>
                                         </div>
                                         <p className="text-body2 font-bold text-neutral-800 leading-snug mb-1" dangerouslySetInnerHTML={{ __html: item.description }}></p>
-                                        <p className="text-tag font-bold text-neutral-400 uppercase tracking-widest">
+                                        <p className="text-tag font-bold text-neutral-400 tracking-widest">
                                             {new Date(item.created_at).toLocaleDateString('pt-BR')} às {new Date(item.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                         </p>
                                     </div>
@@ -314,8 +323,42 @@ export const OrderTracking: React.FC = () => {
                 </div>
 
                 {/* Footer */}
-                <div className="flex flex-col items-center gap-4 py-10 opacity-60">
-                    <p className="text-body2 text-neutral-400 font-medium tracking-tight">Sistema de Gestão de Vendas desenvolvido pela <span className="text-neutral-900 font-bold">QRIVO</span></p>
+                <div className="flex flex-col items-center gap-4 py-10">
+                    <a
+                        href="https://qrivo.com.br/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="transition-all hover:scale-105 active:scale-95"
+                    >
+                        <img
+                            src="https://0e65cb6695ddeca8cb391ef6f8f9b815.cdn.bubble.io/f1759800667234x298580053943223740/logo%20qrivo%20ia.svg"
+                            alt="Qrivo.IA"
+                            className="h-8 w-auto pointer-events-none select-none transition-all duration-300"
+                        />
+                    </a>
+                    <p className="text-body2 text-neutral-400 font-medium tracking-tight">Sistema de vendas com IA desenvolvido por <span className="text-neutral-900 font-bold">qrivo.ia</span></p>
+                    <Button
+                        variant="secondary"
+                        onClick={() => window.open('https://qrivo.com.br/', '_blank')}
+                        className="mt-2"
+                        rightIcon="ph-bold ph-arrow-square-out"
+                    >
+                        Conhecer a Qrivo
+                    </Button>
+
+                    {/* Disclaimer */}
+                    <div className="mt-8 pt-6 border-t border-neutral-100 w-full flex flex-col gap-3">
+                        <p className="text-[11px] text-neutral-400 font-medium leading-relaxed text-center">
+                            A <span className="text-neutral-500 font-bold">qrivo.ia</span> é uma plataforma de tecnologia de vendas e não possui responsabilidade direta sobre a venda, entrega ou suporte deste pedido.
+                            As informações e atualizações são de inteira responsabilidade da empresa vendedora abaixo:
+                        </p>
+                        <div className="flex flex-col items-center gap-1">
+                            <p className="text-[12px] text-neutral-600 font-bold">{(order as any).company?.name || 'empresa responsável'}</p>
+                            <p className="text-[11px] text-neutral-400 font-medium tracking-wider">
+                                CNPJ: {formatCNPJ((order as any).company?.cnpj) || 'não informado'}
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

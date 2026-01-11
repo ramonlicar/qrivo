@@ -243,11 +243,12 @@ const App: React.FC = () => {
     );
   }
 
-  if (location.pathname.startsWith('/rastreio/')) {
+  if (location.pathname === '/rastreio' || location.pathname.startsWith('/rastreio/')) {
     return (
       <Suspense fallback={<LoadingState />}>
         <Routes>
-          <Route path="/rastreio/:id" element={<OrderTracking />} />
+          <Route path="/rastreio" element={<OrderTracking />} />
+          <Route path="/rastreio/:code" element={<OrderTracking />} />
         </Routes>
       </Suspense>
     );

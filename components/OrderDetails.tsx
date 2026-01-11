@@ -7,6 +7,8 @@ import { ConfirmPaymentModal } from './ConfirmPaymentModal';
 import { CancelPaymentModal } from './CancelPaymentModal';
 import { ViewReceiptModal } from './ViewReceiptModal';
 import { ConfirmRefundModal } from './ConfirmRefundModal';
+import { ConfirmRestoreModal } from './ConfirmRestoreModal';
+import { ConfirmArchiveModal } from './ConfirmArchiveModal';
 import { useParams } from 'react-router-dom';
 import { ordersService } from '../lib/services';
 import { getUserCompanyId, supabase } from '../lib/supabase';
@@ -71,6 +73,8 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ order: initialOrder,
   const [isReceiptViewModalOpen, setIsReceiptViewModalOpen] = useState(false);
   const [isCancelPaymentModalOpen, setIsCancelPaymentModalOpen] = useState(false);
   const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
+  const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
+  const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
   const [isCustomerSelectionModalOpen, setIsCustomerSelectionModalOpen] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '' });
 
@@ -178,6 +182,7 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ order: initialOrder,
   const handleRestoreOrder = async () => {
     // Optimistic
     setLocalOrder(prev => (prev ? { ...prev, payment_status: 'PENDENTE', order_status: 'NOVO', updated_at: new Date().toISOString() } : null));
+    setIsRestoreModalOpen(false);
     showToast('Pedido restaurado com sucesso.');
 
     // Persistent
@@ -198,6 +203,7 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ order: initialOrder,
   const handleArchiveOrder = async () => {
     // Optimistic
     setLocalOrder(prev => (prev ? { ...prev, order_status: 'CANCELADO', updated_at: new Date().toISOString() } : null));
+    setIsArchiveModalOpen(false);
     showToast('Pedido arquivado!');
 
     try {
@@ -475,14 +481,19 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ order: initialOrder,
     }
   };
 
+  const handleCopyLink = () => {
+    const link = `${window.location.origin}/rastreio/${localOrder.code}`;
+    navigator.clipboard.writeText(link);
+    showToast('Link copiado!');
+  };
+
   const whatsappLink = `https://wa.me/${localOrder.customer_phone.replace(/\D/g, '')}`;
 
   return (
     <div className="flex flex-col w-full h-full bg-white animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
       {toast.show && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-3 px-6 py-3 bg-primary-100 border border-primary-500 rounded-xl shadow-lg animate-in fade-in slide-in-from-top-4 duration-300">
-          <i className="ph ph-check-circle ph-fill text-primary-600 text-xl"></i>
-          <span className="text-body2 font-bold text-primary-900">{toast.message}</span>
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[200] flex items-center justify-center px-6 py-3 bg-neutral-900 rounded-lg shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <span className="text-body2 font-medium text-white">{toast.message}</span>
         </div>
       )}
 
@@ -500,7 +511,7 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ order: initialOrder,
               </Badge>
             </div>
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="text-small text-neutral-400 font-medium whitespace-nowrap">Criado em {new Date(localOrder.created_at).toLocaleDateString('pt-BR')}</span>
+              <span className="text-small text-neutral-400 font-medium whitespace-nowrap">Criado em {new Date(localOrder.created_at).toLocaleDateString('pt-BR')} às {new Date(localOrder.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
               {localOrder.updated_at && (
                 <>
                   <span className="w-1 h-1 rounded-full bg-neutral-300 hidden sm:block"></span>
@@ -513,26 +524,26 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ order: initialOrder,
         <div className="flex items-center gap-3 w-full sm:w-auto">
           {localOrder.order_status === 'new' || localOrder.order_status === 'NOVO' ? (
             <>
-              <Button variant="secondary" className="w-[114px] sm:flex-none !h-[36px]" onClick={handleArchiveOrder}>Arquivar</Button>
+              <Button variant="secondary" className="w-[114px] sm:flex-none !h-[36px]" onClick={() => setIsArchiveModalOpen(true)}>Arquivar</Button>
               <Button variant="danger" className="flex-1 sm:flex-none !h-[36px]" onClick={handleConfirmOrder}>Confirmar Pedido</Button>
             </>
           ) : localOrder.order_status === 'confirmed' ? (
             <>
-              <Button variant="secondary" className="w-[114px] sm:flex-none !h-[36px]" onClick={handleArchiveOrder}>Arquivar</Button>
+              <Button variant="secondary" className="w-[114px] sm:flex-none !h-[36px]" onClick={() => setIsArchiveModalOpen(true)}>Arquivar</Button>
               <Button variant="neutral" className="flex-1 sm:flex-none !h-[36px]" onClick={handleStartPreparing}>Iniciar Separação</Button>
             </>
           ) : localOrder.order_status === 'preparing' || localOrder.order_status === 'PREPARANDO' ? (
             <>
-              <Button variant="secondary" className="w-[114px] sm:flex-none !h-[36px]" onClick={handleArchiveOrder}>Arquivar</Button>
+              <Button variant="secondary" className="w-[114px] sm:flex-none !h-[36px]" onClick={() => setIsArchiveModalOpen(true)}>Arquivar</Button>
               <Button variant="primary" className="flex-1 sm:flex-none !h-[36px]" onClick={handleStartShipping}>Iniciar Entrega</Button>
             </>
           ) : localOrder.order_status === 'shipped' || localOrder.order_status === 'ENVIADO' ? (
             <>
-              <Button variant="secondary" className="w-[114px] sm:flex-none !h-[36px]" onClick={handleArchiveOrder}>Arquivar</Button>
+              <Button variant="secondary" className="w-[114px] sm:flex-none !h-[36px]" onClick={() => setIsArchiveModalOpen(true)}>Arquivar</Button>
               <Button variant="primary" className="flex-1 sm:flex-none !h-[36px]" onClick={handleConfirmDelivery}>Confirmar Entrega</Button>
             </>
           ) : ['delivered', 'archived', 'canceled', 'ENTREGUE', 'CANCELADO', 'ARQUIVADO', 'ENVIADO'].includes(localOrder.order_status) ? (
-            <Button variant="secondary" className="w-[114px] sm:flex-none !h-[36px]" onClick={handleRestoreOrder}>Restaurar</Button>
+            <Button variant="secondary" className="w-[114px] sm:flex-none !h-[36px]" onClick={() => setIsRestoreModalOpen(true)}>Restaurar</Button>
           ) : null}
         </div>
       </div>
@@ -590,7 +601,7 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ order: initialOrder,
                   <div className="flex flex-col flex-1">
                     <span className="text-body2 font-medium text-neutral-500 mb-1">Resumo do Pedido</span>
                     <p className="text-body2 font-bold text-neutral-black leading-tight">
-                      {(localOrder.items || []).length} itens — {localOrder.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      {localOrder.order_summary || 'Não informado'}
                     </p>
                   </div>
                 </div>
@@ -649,14 +660,24 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ order: initialOrder,
               <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
                   <h5 className="text-h5 font-bold text-neutral-black">Histórico</h5>
-                  <Button
-                    variant="secondary"
-                    className="!h-[32px] px-3 text-[11px]"
-                    leftIcon="ph-bold ph-share-network"
-                    onClick={() => window.open(`${window.location.origin}/rastreio/${localOrder.id}`, '_blank')}
-                  >
-                    Página de Acompanhamento
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="secondary"
+                      className="!h-[32px] px-3 text-[11px]"
+                      leftIcon="ph-bold ph-copy"
+                      onClick={handleCopyLink}
+                    >
+                      Copiar link
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      className="!h-[32px] px-3 text-[11px]"
+                      leftIcon="ph-bold ph-share-network"
+                      onClick={() => window.open(`${window.location.origin}/rastreio/${localOrder.code}`, '_blank')}
+                    >
+                      Página de Acompanhamento
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Visual Status Tracker */}
@@ -804,7 +825,7 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ order: initialOrder,
                   {localOrder.payment_status === 'PENDENTE' || localOrder.payment_status === 'pending' ? (
                     <Button variant="neutral" className="w-full !h-[36px]" onClick={() => setIsPaymentModalOpen(true)}>Marcar como Pago</Button>
                   ) : localOrder.payment_status === 'REEMBOLSADO' || localOrder.payment_status === 'refunded' ? (
-                    <Button variant="secondary" className="w-full !h-[36px]" onClick={handleRestoreOrder}>Restaurar</Button>
+                    <Button variant="secondary" className="w-full !h-[36px]" onClick={() => setIsRestoreModalOpen(true)}>Restaurar</Button>
                   ) : (
                     <>
                       <Button variant="secondary" className="w-full !h-[36px]" onClick={() => setIsCancelPaymentModalOpen(true)}>Cancelar Pagamento</Button>
@@ -886,6 +907,18 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ order: initialOrder,
         isOpen={isRefundModalOpen}
         onClose={() => setIsRefundModalOpen(false)}
         onConfirm={handleConfirmRefund}
+      />
+
+      <ConfirmRestoreModal
+        isOpen={isRestoreModalOpen}
+        onClose={() => setIsRestoreModalOpen(false)}
+        onConfirm={handleRestoreOrder}
+      />
+
+      <ConfirmArchiveModal
+        isOpen={isArchiveModalOpen}
+        onClose={() => setIsArchiveModalOpen(false)}
+        onConfirm={handleArchiveOrder}
       />
 
       <ViewReceiptModal

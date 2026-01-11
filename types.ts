@@ -40,6 +40,7 @@ export interface Order {
   observations?: string;
   receipt_url?: string;
   payment_method?: string;
+  order_summary?: string;
   items?: OrderItem[];
 }
 
@@ -97,6 +98,17 @@ export interface User {
   created_at: string;
   last_active_at?: string;
   whatsapp?: string;
+}
+
+export interface Company {
+  id: string;
+  name: string;
+  cnpj?: string;
+  business_area?: string;
+  business_description?: string;
+  avatar_url?: string;
+  owner_user_id: string;
+  created_at: string;
 }
 
 export interface UserCompanyMembership {

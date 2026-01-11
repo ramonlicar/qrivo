@@ -14,7 +14,7 @@ import { PlansTab } from './PlansTab';
 import { TeamMember } from '../types';
 import { teamService, userService, companiesService } from '../lib/services';
 import { getUserCompanyId, supabase } from '../lib/supabase';
-import { formatWhatsApp, cleanWhatsApp } from '../lib/utils';
+import { formatWhatsApp, cleanWhatsApp, formatCNPJ, cleanCNPJ } from '../lib/utils';
 
 type SettingsTab = 'perfil' | 'empresa' | 'equipe' | 'senha' | 'planos' | 'logout';
 
@@ -66,6 +66,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ initialTab, on
     slug: '',
     business_area: '',
     business_description: '',
+    cnpj: '',
     owner_user_id: '',
   });
 
@@ -132,6 +133,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ initialTab, on
             slug: companyObj.slug,
             business_area: normalizedArea,
             business_description: companyObj.business_description,
+            cnpj: formatCNPJ(companyObj.cnpj || ''),
             owner_user_id: companyObj.owner_user_id,
           });
         }
@@ -266,6 +268,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ initialTab, on
         slug: empresaData.nome.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
         business_area: empresaData.business_area,
         business_description: empresaData.business_description,
+        cnpj: cleanCNPJ(empresaData.cnpj),
         updated_at: new Date().toISOString()
       });
       if (error) throw error;
@@ -470,6 +473,15 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ initialTab, on
                   <div className="flex flex-col gap-2 md:col-span-2">
                     <label className="text-body2 font-bold text-neutral-black">Nome da Empresa</label>
                     <TextInput value={empresaData.nome} onChange={(e) => setEmpresaData({ ...empresaData, nome: e.target.value })} containerClassName="!h-[34px] !bg-white !border-[#DDDDD5]" />
+                  </div>
+                  <div className="flex flex-col gap-2 w-full max-w-[200px]">
+                    <label className="text-body2 font-bold text-neutral-black">CNPJ</label>
+                    <TextInput
+                      value={empresaData.cnpj}
+                      onChange={(e) => setEmpresaData({ ...empresaData, cnpj: formatCNPJ(e.target.value) })}
+                      containerClassName="!h-[34px] !bg-white !border-[#DDDDD5]"
+                      placeholder="00.000.000/0000-00"
+                    />
                   </div>
                   <div className="flex flex-col gap-2 md:col-span-2">
                     <label className="text-body2 font-bold text-neutral-black">Área de Atuação</label>
