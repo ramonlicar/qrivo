@@ -19,6 +19,7 @@ interface SidebarProps {
     used: number;
     total: number;
   };
+  badges?: Record<string, number>;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -29,7 +30,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activePath,
   onNavigate,
   userStats = { plan: 'Plano Gratuito', used: 0, total: 50 },
-  userProfile = { name: 'Usuário', avatar_url: '' }
+  userProfile = { name: 'Usuário', avatar_url: '' },
+  badges = {}
 }) => {
 
 
@@ -127,6 +129,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               <span className={`text-body2 leading-none font-semibold tracking-tight truncate ${isActive ? 'text-primary-600' : 'text-neutral-black'}`}>
                                 {item.label}
                               </span>
+                            )}
+
+                            {/* Badge count */}
+                            {badges[item.label] !== undefined && badges[item.label] > 0 && (
+                              <div className={`
+                                flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full 
+                                bg-system-error-500 text-[10px] font-black text-white ml-auto
+                                animate-in zoom-in duration-300
+                                ${isCollapsed ? 'absolute -top-1 -right-1 shadow-sm' : ''}
+                              `}>
+                                {badges[item.label] > 99 ? '99+' : badges[item.label]}
+                              </div>
                             )}
                           </button>
                         </SidebarTooltip>

@@ -5,7 +5,7 @@ import { Sidebar } from './components/Sidebar';
 import { GuideTourModal } from './components/GuideTourModal';
 import { Order, Product } from './types';
 import { supabase } from './lib/supabase';
-import { userService, companiesService, plansService } from './lib/services';
+import { userService, companiesService, plansService, ordersService } from './lib/services';
 
 // Lazy loaded components para melhor performance de carregamento inicial
 const Home = lazy(() => import('./components/Home').then(m => ({ default: m.Home })));
@@ -47,6 +47,7 @@ const App: React.FC = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(window.innerWidth < 1200);
   const [userProfile, setUserProfile] = useState({ name: '', avatar_url: '' });
   const [userStats, setUserStats] = useState({ plan: '...', used: 0, total: 0 });
+  const [newOrdersCount, setNewOrdersCount] = useState(0);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -155,6 +156,54 @@ const App: React.FC = () => {
     };
 
     loadUserData();
+  }, [session]);
+
+  // Carregar e monitorar contagem de novos pedidos
+  useEffect(() => {
+    let channel: any = null;
+
+    const setupOrderCount = async () => {
+      if (!session?.user?.id) return;
+
+      try {
+        const { data: company } = await companiesService.getMyCompany(session.user.id);
+        if (!company) return;
+
+        const companyId = company.id;
+
+        // Fetch inicial
+        const { count } = await ordersService.getNewOrdersCount(companyId);
+        setNewOrdersCount(count);
+
+        // Inscrição em tempo real
+        channel = supabase
+          .channel(`sidebar-orders-count-${companyId}`)
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'orders',
+              filter: `company_id=eq.${companyId}`,
+            },
+            async () => {
+              const { count: updatedCount } = await ordersService.getNewOrdersCount(companyId);
+              setNewOrdersCount(updatedCount);
+            }
+          )
+          .subscribe();
+      } catch (err) {
+        console.error('Erro ao gerenciar contagem de pedidos:', err);
+      }
+    };
+
+    setupOrderCount();
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
   }, [session]);
 
   const refreshProfile = async () => {
@@ -289,6 +338,7 @@ const App: React.FC = () => {
         }}
         userProfile={userProfile}
         userStats={userStats}
+        badges={{ 'Pedidos': newOrdersCount }}
       />
       <main className="flex flex-col flex-1 h-screen overflow-hidden items-center relative">
         <div className="flex flex-col w-full h-full py-[6px] pr-[6px] pl-0 sm:py-[12px] sm:pr-[12px] lg:py-[16px] lg:pr-[16px] gap-[8px] overflow-hidden">

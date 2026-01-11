@@ -660,6 +660,16 @@ export const ordersService = {
     return { data: data || [], count: count || 0, error };
   },
 
+  async getNewOrdersCount(companyId: string): Promise<{ count: number; error: any }> {
+    const { count, error } = await supabase
+      .from('orders')
+      .select('*', { count: 'exact', head: true })
+      .eq('company_id', companyId)
+      .in('order_status', ['new', 'NOVO']);
+
+    return { count: count || 0, error };
+  },
+
   async getOrderById(orderId: string): Promise<{ data: any; error: any }> {
     const { data, error } = await supabase
       .from('orders')
