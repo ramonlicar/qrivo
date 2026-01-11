@@ -90,34 +90,50 @@ export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar }) => {
 
   useEffect(() => {
     loadOrders();
-
     let channel: any = null;
 
     const setupRealtime = async () => {
-      const companyId = await getUserCompanyId();
-      if (!companyId) return;
+      try {
+        const companyId = await getUserCompanyId();
+        if (!companyId) return;
 
-      channel = supabase
-        .channel('orders-list-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'orders',
-            filter: `company_id=eq.${companyId}`,
-          },
-          () => {
-            loadOrders();
-          }
-        )
-        .subscribe();
+        console.log('[Home] Setting up real-time for company:', companyId);
+
+        // Cleanup existing channel if any
+        if (channel) {
+          supabase.removeChannel(channel);
+        }
+
+        channel = supabase
+          .channel(`orders-realtime-${companyId}`)
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'orders',
+              filter: `company_id=eq.${companyId}`,
+            },
+            (payload) => {
+              console.log('[Home] Real-time update received:', payload.eventType);
+              loadOrders();
+            }
+          )
+          .subscribe((status) => {
+            console.log('[Home] Real-time subscription status:', status);
+          });
+      } catch (err) {
+        console.error('[Home] Error setting up real-time:', err);
+      }
     };
 
     setupRealtime();
 
     return () => {
-      if (channel) supabase.removeChannel(channel);
+      if (channel) {
+        console.log('[Home] Cleaning up real-time channel');
+        supabase.removeChannel(channel);
+      }
     };
   }, [loadOrders]);
 
