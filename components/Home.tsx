@@ -8,11 +8,13 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Badge } from './Badge';
 import { Dropdown } from './Dropdown';
+import { DateRangeFilter } from './DateRangeFilter';
 import { TextInput } from './TextInput';
 import { Pagination } from './Pagination';
 import { Button } from './Button';
 import { IconButton } from './IconButton';
 import { StatsCard } from './StatsCard';
+import { ConfirmDeleteOrderModal } from './ConfirmDeleteOrderModal';
 import { Order, Stats } from '../types';
 import { ordersService } from '../lib/services';
 import { getUserCompanyId, supabase } from '../lib/supabase';
@@ -45,9 +47,11 @@ const PAYMENT_STATUS_MAP: Record<string, { label: string; variant: 'success' | '
 interface HomeProps {
   onOrderSelect: (order: Order) => void;
   onOpenSidebar: () => void;
+  onNewOrder: () => void;
+  onEditOrder: (order: Order) => void;
 }
 
-export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar }) => {
+export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar, onNewOrder, onEditOrder }) => {
   const [orders, setOrders] = useState<any[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -56,8 +60,23 @@ export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar }) => {
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
   const [sortOption, setSortOption] = useState('newest');
+  const [dateRange, setDateRange] = useState<{ start: string | null; end: string | null }>({ start: null, end: null });
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 12;
+  // Stats state management
+  const [stats, setStats] = useState<Stats>({
+    totalOrders: 0,
+    newOrders: 0,
+    paidOrders: 0,
+    totalRevenue: 0,
+    averageTicket: 0
+
+  });
+
+  // Delete Modal State
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const loadOrders = useCallback(async () => {
     setIsLoading(true);
@@ -70,15 +89,42 @@ export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar }) => {
         setIsLoading(false);
         return;
       }
-      const { data, count, error } = await ordersService.getOrders(companyId, currentPage, itemsPerPage);
-      if (error) {
-        console.error("Erro ao buscar pedidos:", error);
+
+      // Prepare filters object
+      const activeFilters = {
+        startDate: dateRange.start || undefined,
+        endDate: dateRange.end || undefined,
+        searchTerm: searchTerm || undefined,
+        status: statusFilter || undefined,
+        paymentStatus: paymentStatusFilter || undefined,
+        paymentMethod: paymentMethodFilter || undefined
+      };
+
+      // Parallel fetch for orders and stats
+      const [ordersRes, statsRes] = await Promise.all([
+        ordersService.getOrders(companyId, currentPage, itemsPerPage, activeFilters, sortOption),
+        ordersService.getOrdersStats(companyId, activeFilters)
+      ]);
+
+      if (ordersRes.error) {
+        console.error("Erro ao buscar pedidos:", ordersRes.error);
         setOrders([]);
         setTotalCount(0);
       } else {
-        setOrders(data || []);
-        setTotalCount(count || 0);
+        setOrders(ordersRes.data || []);
+        setTotalCount(ordersRes.count || 0);
       }
+
+      if (!statsRes.error) {
+        setStats({
+          totalOrders: statsRes.totalOrders,
+          newOrders: statsRes.newOrders,
+          paidOrders: statsRes.paidOrders,
+          totalRevenue: statsRes.totalRevenue,
+          averageTicket: statsRes.averageTicket
+        });
+      }
+
     } catch (err) {
       console.error("Erro ao carregar pedidos:", err);
       setOrders([]);
@@ -86,7 +132,7 @@ export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage]);
+  }, [currentPage, dateRange, searchTerm, statusFilter, paymentStatusFilter, paymentMethodFilter, sortOption]);
 
   useEffect(() => {
     loadOrders();
@@ -137,48 +183,15 @@ export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar }) => {
     };
   }, [loadOrders]);
 
-  const stats = useMemo((): Stats => {
-    const paidOnes = orders.filter(o => o.payment_status?.toLowerCase() === 'paid' || o.paymentStatus === 'PAGO');
-    const revenue = paidOnes.reduce((acc, curr) => acc + (Number(curr.total) || 0), 0);
-    return {
-      totalOrders: totalCount,
-      newOrders: orders.filter(o => o.order_status?.toLowerCase() === 'new' || o.status === 'NOVO').length,
-      paidOrders: paidOnes.length,
-      totalRevenue: revenue,
-      averageTicket: paidOnes.length > 0 ? revenue / paidOnes.length : 0
-    };
-  }, [orders, totalCount]);
+  // Stats are now managed via state from backend response
+  // const stats = useMemo(...) removed
 
-  const filteredOrders = useMemo(() => {
-    let result = orders.filter((order) => {
-      const name = (order.customer_name || '').toLowerCase();
-      const code = (order.code || '').toLowerCase();
-      const matchesSearch = name.includes(searchTerm.toLowerCase()) || code.includes(searchTerm.toLowerCase());
+  // Removed client-side filteredOrders memoization since filtering is now server-side
+  const filteredOrders = orders; // Direct assignment as orders are already filtered by backend
 
-      const matchesStatus = statusFilter ? order.order_status === statusFilter : true;
-      const matchesPaymentStatus = paymentStatusFilter ? order.payment_status === paymentStatusFilter : true;
-      const matchesPaymentMethod = paymentMethodFilter ? order.payment_method === paymentMethodFilter : true;
 
-      return matchesSearch && matchesStatus && matchesPaymentStatus && matchesPaymentMethod;
-    });
-
-    // Sorting
-    return result.sort((a, b) => {
-      if (sortOption === 'newest') {
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      } else if (sortOption === 'oldest') {
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      } else if (sortOption === 'highest_value') {
-        return (Number(b.total) || 0) - (Number(a.total) || 0);
-      } else if (sortOption === 'lowest_value') {
-        return (Number(a.total) || 0) - (Number(b.total) || 0);
-      }
-      return 0;
-    });
-  }, [orders, searchTerm, statusFilter, paymentStatusFilter, paymentMethodFilter, sortOption]);
-
-  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
-  const paginatedOrders = filteredOrders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const totalPages = Math.ceil(totalCount / itemsPerPage);
+  const paginatedOrders = filteredOrders;
 
   const tableGridClass = "grid grid-cols-[1.5fr_100px_110px_120px_140px_100px_50px] gap-4 items-center px-6";
 
@@ -199,7 +212,7 @@ export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar }) => {
 
           <div className="flex items-center gap-3">
             <IconButton icon="ph-arrows-clockwise" variant="neutral" onClick={loadOrders} className={isLoading ? 'animate-spin' : ''} title="Sincronizar" />
-            <Button variant="primary" className="!h-[36px] font-bold" leftIcon="ph ph-plus">Novo Pedido</Button>
+            <Button variant="primary" className="!h-[36px] font-bold" leftIcon="ph ph-plus" onClick={onNewOrder}>Novo Pedido</Button>
           </div>
         </div>
 
@@ -210,16 +223,19 @@ export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar }) => {
               leftIcon="ph-magnifying-glass"
               placeholder="Buscar cliente ou código..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
               containerClassName="w-full max-w-[320px] !h-[36px]"
             />
             {/* Filtro Status Pedido */}
             <Dropdown
               label="Status do Pedido"
               value={statusFilter}
-              onChange={setStatusFilter}
+              onChange={(val) => { setStatusFilter(val); setCurrentPage(1); }}
               options={[
                 { label: 'Novos', value: 'new', color: 'bg-system-error-500' },
+                { label: 'Confirmados', value: 'confirmed', color: 'bg-blue-500' },
+                { label: 'Preparando', value: 'preparing', color: 'bg-yellow-500' },
+                { label: 'Enviados', value: 'shipped', color: 'bg-purple-500' },
                 { label: 'Entregues', value: 'delivered', color: 'bg-primary-500' },
                 { label: 'Cancelados', value: 'canceled', color: 'bg-neutral-400' }
               ]}
@@ -229,11 +245,11 @@ export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar }) => {
             <Dropdown
               label="Status Pagamento"
               value={paymentStatusFilter}
-              onChange={setPaymentStatusFilter}
+              onChange={(val) => { setPaymentStatusFilter(val); setCurrentPage(1); }}
               options={[
                 { label: 'Pago', value: 'paid', color: 'bg-emerald-500' },
                 { label: 'Pendente', value: 'pending', color: 'bg-amber-500' },
-                { label: 'Falhou', value: 'failed', color: 'bg-rose-500' }
+                { label: 'Reembolsado', value: 'refunded', color: 'bg-neutral-500' }
               ]}
               className="min-w-[160px] shrink-0 h-[36px]"
             />
@@ -241,16 +257,26 @@ export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar }) => {
             <Dropdown
               label="Forma Pagamento"
               value={paymentMethodFilter}
-              onChange={setPaymentMethodFilter}
+              onChange={(val) => { setPaymentMethodFilter(val); setCurrentPage(1); }}
               options={[
                 { label: 'PIX', value: 'pix' },
                 { label: 'Cartão de Crédito', value: 'credit_card' },
-                { label: 'Boleto', value: 'boleto' }
+                { label: 'Cartão de Débito', value: 'debit_card' },
+                { label: 'Boleto', value: 'boleto' },
+                { label: 'Dinheiro', value: 'cash' },
+                { label: 'Transferência', value: 'transfer' }
               ]}
               className="min-w-[160px] shrink-0 h-[36px]"
             />
+            {/* Filtro Data */}
+            <DateRangeFilter
+              startDate={dateRange.start}
+              endDate={dateRange.end}
+              onChange={(start, end) => { setDateRange({ start, end }); setCurrentPage(1); }}
+              className="min-w-[140px] shrink-0 h-[36px]"
+            />
 
-            {(searchTerm || statusFilter || paymentStatusFilter || paymentMethodFilter) && (
+            {(searchTerm || statusFilter || paymentStatusFilter || paymentMethodFilter || dateRange.start) && (
               <Button
                 variant="danger-light"
                 onClick={() => {
@@ -258,6 +284,7 @@ export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar }) => {
                   setStatusFilter('');
                   setPaymentStatusFilter('');
                   setPaymentMethodFilter('');
+                  setDateRange({ start: null, end: null });
                 }}
                 className="!h-[36px]"
                 leftIcon="ph ph-x-circle"
@@ -270,6 +297,7 @@ export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar }) => {
           {/* Sort Layout Fixed to Right */}
           <div className="flex-none pl-4 border-l border-neutral-100 hidden lg:block">
             <Dropdown
+              align="right"
               label=""
               leftIcon="ph-sort-ascending"
               value={sortOption}
@@ -331,7 +359,7 @@ export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar }) => {
         </div>
 
         {/* Listagem de Pedidos */}
-        <div className="bg-white border border-neutral-200 shadow-small rounded-[12px] overflow-hidden mb-10">
+        <div className="bg-white border border-neutral-200 shadow-small rounded-[12px] overflow-hidden mb-10 h-auto flex-none">
           <div className="w-full overflow-x-auto">
             <div className="min-w-[1000px] w-full">
               {/* Table Header */}
@@ -346,7 +374,7 @@ export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar }) => {
               </div>
 
               {/* Table Body */}
-              <div className="flex flex-col divide-y divide-neutral-100">
+              <div className="flex flex-col divide-y divide-neutral-100 h-auto">
                 {isLoading ? (
                   <div className="flex flex-col items-center justify-center py-20 gap-3">
                     <i className="ph ph-circle-notch animate-spin text-3xl text-neutral-300"></i>
@@ -360,7 +388,7 @@ export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar }) => {
                       <div
                         key={order.id}
                         onClick={() => onOrderSelect(order)}
-                        className="grid grid-cols-[100px_minmax(250px,1.5fr)_180px_140px_140px_140px_100px] gap-4 items-center px-6 min-h-[72px] py-3 hover:bg-neutral-25 transition-all group cursor-pointer"
+                        className="grid grid-cols-[100px_minmax(250px,1.5fr)_180px_140px_140px_140px_100px] gap-4 items-center px-6 min-h-[56px] py-2 hover:bg-neutral-25 transition-all group cursor-pointer"
                       >
                         {/* Código */}
                         <span
@@ -415,7 +443,7 @@ export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar }) => {
                             icon="ph-pencil-simple"
                             variant="neutral"
                             size="sm"
-                            onClick={(e) => { e.stopPropagation(); onOrderSelect(order); }}
+                            onClick={(e) => { e.stopPropagation(); onEditOrder(order); }}
                             title="Editar Pedido"
                           />
                           <IconButton
@@ -424,10 +452,8 @@ export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar }) => {
                             size="sm"
                             onClick={async (e) => {
                               e.stopPropagation();
-                              if (confirm('Tem certeza que deseja excluir este pedido?')) {
-                                await ordersService.deleteOrder(order.id);
-                                loadOrders();
-                              }
+                              setOrderToDelete(order);
+                              setDeleteModalOpen(true);
                             }}
                             title="Excluir Pedido"
                           />
@@ -452,12 +478,37 @@ export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar }) => {
 
           <div className="flex items-center justify-between p-4 border-t border-neutral-100 bg-white">
             <span className="text-body2 font-medium text-neutral-500">
-              Exibindo <span className="font-bold text-neutral-black">{filteredOrders.length}</span> de <span className="font-bold text-neutral-black">{totalCount}</span> Resultado(s)
+              Exibindo <span className="font-bold text-neutral-black">{(currentPage - 1) * itemsPerPage + filteredOrders.length}</span> de <span className="font-bold text-neutral-black">{totalCount}</span> Resultado(s)
             </span>
             <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
           </div>
         </div>
       </div>
+
+      <ConfirmDeleteOrderModal
+        isOpen={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false);
+          setOrderToDelete(null);
+        }}
+        onConfirm={async () => {
+          if (orderToDelete) {
+            setIsDeleting(true);
+            try {
+              await ordersService.deleteOrder(orderToDelete.id);
+              await loadOrders();
+              setDeleteModalOpen(false);
+              setOrderToDelete(null);
+            } catch (error) {
+              console.error("Failed to delete order", error);
+              alert("Erro ao excluir pedido.");
+            } finally {
+              setIsDeleting(false);
+            }
+          }
+        }}
+        isDeleting={isDeleting}
+      />
     </div>
   );
 };

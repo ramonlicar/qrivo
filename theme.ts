@@ -170,8 +170,7 @@ export const theme = {
         "fontSize": "11px",
         "fontWeight": 500,
         "letterSpacing": "0.02em",
-        "lineHeight": "18px",
-        "textTransform": "uppercase"
+        "lineHeight": "18px"
       },
       "desktop-small-texts-1---regular": {
         "fontSize": "12px",
@@ -309,8 +308,7 @@ export const theme = {
         "fontSize": "12px",
         "fontWeight": 500,
         "letterSpacing": "0.02em",
-        "lineHeight": "18px",
-        "textTransform": "uppercase"
+        "lineHeight": "18px"
       },
       "mobile-small-texts-1m---regular": {
         "fontSize": "10px",

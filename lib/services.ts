@@ -228,7 +228,7 @@ export const userService = {
 
   async uploadAvatar(userId: string, file: File, userEmail?: string) {
     const fileExt = file.name.split('.').pop();
-    const fileName = `avatar.${fileExt}`;
+    const fileName = `avatar_${Date.now()}.${fileExt}`;
     const filePath = `${userId}/${fileName}`;
 
     // 1. Upload file to storage (overwrite if exists)
@@ -646,18 +646,145 @@ export const customersService = {
 
 // --- Orders Service ---
 export const ordersService = {
-  async getOrders(companyId: string, page = 1, pageSize = 10): Promise<PaginatedResponse<any>> {
+  async getOrders(
+    companyId: string,
+    page = 1,
+    pageSize = 10,
+    filters?: {
+      startDate?: string;
+      endDate?: string;
+      searchTerm?: string;
+      status?: string;
+      paymentStatus?: string;
+      paymentMethod?: string;
+    },
+    sortBy: string = 'newest'
+  ): Promise<PaginatedResponse<any>> {
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
 
-    const { data, error, count } = await supabase
+    let query = supabase
       .from('orders')
       .select('*, items:order_items(*)', { count: 'exact' })
-      .eq('company_id', companyId)
-      .order('created_at', { ascending: false })
+      .eq('company_id', companyId);
+
+    if (filters?.startDate) {
+      query = query.gte('created_at', filters.startDate);
+    }
+    if (filters?.endDate) {
+      query = query.lte('created_at', filters.endDate);
+    }
+    if (filters?.searchTerm) {
+      const term = `%${filters.searchTerm}%`;
+      query = query.or(`customer_name.ilike.${term},code.ilike.${term}`);
+    }
+    // Postgres ENUMs require strict matching with valid labels.
+    // Frontend sends 'new', 'delivered', 'canceled' which match the DB enum exactly.
+    if (filters?.status) {
+      query = query.eq('order_status', filters.status);
+    }
+    if (filters?.paymentStatus) {
+      // Payment status is also an ENUM: 'paid', 'pending', 'refunded'
+      query = query.eq('payment_status', filters.paymentStatus);
+    }
+    if (filters?.paymentMethod) {
+      query = query.eq('payment_method', filters.paymentMethod);
+    }
+
+    // Sorting Logic
+    let orderColumn = 'created_at';
+    let orderAscending = false;
+
+    switch (sortBy) {
+      case 'oldest':
+        orderAscending = true;
+        break;
+      case 'highest_value':
+        orderColumn = 'total';
+        break;
+      case 'lowest_value':
+        orderColumn = 'total';
+        orderAscending = true;
+        break;
+      case 'newest':
+      default:
+        orderColumn = 'created_at';
+        orderAscending = false;
+        break;
+    }
+
+    const { data, error, count } = await query
+      .order(orderColumn, { ascending: orderAscending })
       .range(from, to);
 
     return { data: data || [], count: count || 0, error };
+  },
+
+  async getOrdersStats(
+    companyId: string,
+    filters?: {
+      startDate?: string;
+      endDate?: string;
+      searchTerm?: string;
+      status?: string;
+      paymentStatus?: string;
+      paymentMethod?: string;
+    }
+  ): Promise<{
+    totalOrders: number;
+    newOrders: number;
+    paidOrders: number;
+    totalRevenue: number;
+    averageTicket: number;
+    error?: any
+  }> {
+
+    // Base query for stats - we need to fetch all matching rows to aggregate in JS (Supabase doesn't support aggregate functions easily via JS client yet without RPC)
+    // For large datasets, RPC is better. For now, let's select needed fields.
+    let query = supabase
+      .from('orders')
+      .select('total, order_status, payment_status')
+      .eq('company_id', companyId);
+
+    // Apply exact same filters
+    if (filters?.startDate) query = query.gte('created_at', filters.startDate);
+    if (filters?.endDate) query = query.lte('created_at', filters.endDate);
+    if (filters?.searchTerm) {
+      const term = `%${filters.searchTerm}%`;
+      query = query.or(`customer_name.ilike.${term},code.ilike.${term}`);
+    }
+    // Same robust logic for stats
+    if (filters?.status) {
+      query = query.eq('order_status', filters.status);
+    }
+
+    if (filters?.paymentStatus) {
+      query = query.eq('payment_status', filters.paymentStatus);
+    }
+
+    if (filters?.paymentMethod) query = query.eq('payment_method', filters.paymentMethod);
+
+    const { data, error } = await query;
+
+    if (error) {
+      return { totalOrders: 0, newOrders: 0, paidOrders: 0, totalRevenue: 0, averageTicket: 0, error };
+    }
+
+    const orders = data || [];
+    const totalOrders = orders.length;
+    const newOrders = orders.filter(o => o.order_status?.toLowerCase() === 'new' || o.order_status === 'NOVO').length;
+    const paidOrdersList = orders.filter(o => o.payment_status?.toLowerCase() === 'paid' || o.payment_status === 'PAGO');
+    const paidOrders = paidOrdersList.length;
+    const totalRevenue = paidOrdersList.reduce((acc, curr) => acc + (Number(curr.total) || 0), 0);
+    const averageTicket = paidOrders > 0 ? totalRevenue / paidOrders : 0;
+
+    return {
+      totalOrders,
+      newOrders,
+      paidOrders,
+      totalRevenue,
+      averageTicket
+    };
   },
 
   async getNewOrdersCount(companyId: string): Promise<{ count: number; error: any }> {
@@ -665,7 +792,7 @@ export const ordersService = {
       .from('orders')
       .select('*', { count: 'exact', head: true })
       .eq('company_id', companyId)
-      .in('order_status', ['new', 'NOVO']);
+      .eq('order_status', 'new');
 
     return { count: count || 0, error };
   },
@@ -673,7 +800,7 @@ export const ordersService = {
   async getOrderById(orderId: string): Promise<{ data: any; error: any }> {
     const { data, error } = await supabase
       .from('orders')
-      .select('id, company_id, code, order_status, total, subtotal, shipping_fee, order_summary, created_at, updated_at, company:companies(name, cnpj), items:order_items(*)')
+      .select('*, items:order_items(*), delivery_area:delivery_areas(name)')
       .eq('id', orderId)
       .maybeSingle();
 
@@ -683,11 +810,127 @@ export const ordersService = {
   async getOrderByCode(code: string): Promise<{ data: any; error: any }> {
     const { data, error } = await supabase
       .from('orders')
-      .select('id, company_id, code, order_status, total, subtotal, shipping_fee, order_summary, created_at, updated_at, company:companies(name, cnpj), items:order_items(*)')
+      .select('*, company:companies(name, cnpj), items:order_items(*), delivery_area:delivery_areas(name)')
       .ilike('code', code)
       .maybeSingle();
 
     return { data: data || null, error };
+  },
+
+  async createOrder(companyId: string, orderData: any): Promise<{ data: any; error: any }> {
+    // Determine status based on payment (simplified logic)
+    const status = 'new'; // Default to new
+
+    const { data, error } = await supabase
+      .from('orders')
+      .insert({
+        company_id: companyId,
+        customer_id: orderData.customerId,
+        customer_name: orderData.customerName,
+        customer_phone: orderData.customerPhone, // Added
+        total: orderData.total,
+        subtotal: orderData.subtotal,
+        shipping_fee: orderData.shippingFee || 0,
+        payment_method: orderData.paymentMethod,
+        payment_status: 'pending', // Default
+        order_status: status,
+        order_summary: orderData.notes, // Keep summary
+        observations: orderData.observations || orderData.notes, // Map notes to observations too
+        shipping_address: orderData.shippingAddress,
+        responsible_id: orderData.responsibleId,
+        agent_id: orderData.agentId, // Now passed from frontend
+        delivery_area_id: orderData.deliveryAreaId || null, // Added
+        conversation_id: null, // Required by type, assuming nullable
+        code: Math.random().toString(36).substring(2, 8).toUpperCase(), // Generate simple code
+      })
+      .select()
+      .single();
+
+    if (error) return { data: null, error };
+
+    // Insert Items
+    if (orderData.items && orderData.items.length > 0) {
+      const itemsToInsert = orderData.items.map((item: any) => ({
+        order_id: data.id,
+        product_id: item.productId,
+        name_snapshot: item.name,
+        quantity: item.quantity,
+        price_snapshot: item.price,
+        image_snapshot: item.image || null
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(itemsToInsert);
+
+      if (itemsError) {
+        console.error("Error creating order items:", itemsError);
+        return { data: null, error: itemsError };
+      }
+    }
+
+    return { data, error: null };
+  },
+
+
+  async updateOrder(orderId: string, orderData: any): Promise<{ data: any; error: any }> {
+    // 1. Update Order Fields
+    const { data, error } = await supabase
+      .from('orders')
+      .update({
+        customer_id: orderData.customerId,
+        customer_name: orderData.customerName,
+        customer_phone: orderData.customerPhone,
+        total: orderData.total,
+        subtotal: orderData.subtotal,
+        shipping_fee: orderData.shippingFee || 0,
+        payment_method: orderData.paymentMethod,
+        order_summary: orderData.notes,
+        observations: orderData.observations || orderData.notes,
+        shipping_address: orderData.shippingAddress,
+        responsible_id: orderData.responsibleId,
+        agent_id: orderData.agentId,
+        delivery_area_id: orderData.deliveryAreaId || null, // Added
+      })
+      .eq('id', orderId)
+      .select()
+      .single();
+
+    if (error) return { data: null, error };
+
+    // 2. Handle Items (Delete All + Insert New) strategy
+    if (orderData.items) {
+      // Delete existing
+      const { error: deleteError } = await supabase
+        .from('order_items')
+        .delete()
+        .eq('order_id', orderId);
+
+      if (deleteError) console.error("Error deleting old items:", deleteError);
+
+      if (orderData.items.length > 0) {
+        // Insert new
+        const itemsToInsert = orderData.items.map((item: any) => ({
+          order_id: orderId,
+          product_id: item.productId,
+          name_snapshot: item.name,
+          quantity: item.quantity,
+          price_snapshot: item.price,
+          image_snapshot: item.image || null
+        }));
+
+        const { error: itemsError } = await supabase
+          .from('order_items')
+          .insert(itemsToInsert);
+
+        if (itemsError) {
+          console.error("Error inserting new items:", itemsError);
+          return { data: null, error: itemsError };
+        }
+      }
+    }
+
+    return { data, error: null };
   },
 
   async deleteOrder(orderId: string): Promise<{ error: any }> {
@@ -1375,5 +1618,31 @@ export const productsService = {
     } catch (error) {
       console.error('[RAG] Falha na vetorização:', error);
     }
+  }
+};
+
+// --- Agents Service ---
+export const agentsService = {
+  async getAgents(companyId: string) {
+    const { data, error } = await supabase
+      .from('agents')
+      .select('*')
+      .eq('company_id', companyId)
+      .eq('is_active', true);
+
+    return { data, error };
+  }
+};
+
+// --- Delivery Service ---
+export const deliveryService = {
+  async getDeliveryAreas(companyId: string) {
+    const { data, error } = await supabase
+      .from('delivery_areas')
+      .select('*')
+      .eq('company_id', companyId)
+      .order('name', { ascending: true });
+
+    return { data, error };
   }
 };

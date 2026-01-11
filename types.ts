@@ -28,20 +28,27 @@ export interface Order {
   order_status: 'NOVO' | 'PREPARANDO' | 'ENVIADO' | 'ENTREGUE' | 'CANCELADO' | 'ARQUIVADO' | 'new' | 'confirmed' | 'preparing' | 'shipped' | 'delivered' | 'archived';
   created_at: string;
   updated_at?: string;
-  shipping_address?: {
-    street: string;
-    number: string;
-    city: string;
-    state: string;
-    zipCode: string;
-  };
+  shipping_address?: string;
   delivery_estimate?: string;
   time_preference?: string;
   observations?: string;
   receipt_url?: string;
   payment_method?: string;
   order_summary?: string;
+  delivery_area_id?: string;
+  delivery_area?: { name: string };
   items?: OrderItem[];
+}
+
+export interface DeliveryArea {
+  id: string;
+  company_id: string;
+  name: string;
+  fee: number;
+  estimated_time?: string;
+  covered_regions?: string;
+  is_active: boolean;
+  created_at: string;
 }
 
 export interface OrderActivity {

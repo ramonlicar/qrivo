@@ -458,7 +458,7 @@ export const Customers: React.FC = () => {
               </div>
 
               {/* Table Body */}
-              <div className="flex flex-col divide-y divide-neutral-100 min-h-[200px]">
+              <div className="flex flex-col divide-y divide-neutral-100">
                 {isLoading ? (
                   <div className="flex flex-col items-center justify-center p-10 gap-3">
                     <i className="ph ph-spinner animate-spin text-3xl text-primary-500"></i>

@@ -58,6 +58,10 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ initialTab, on
     whatsapp: ''
   });
 
+  const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(null);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
+  const [stagedRemoveAvatar, setStagedRemoveAvatar] = useState(false);
+
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const [empresaData, setEmpresaData] = useState({
@@ -197,33 +201,33 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ initialTab, on
 
     setIsSaving(true);
     try {
-      const publicUrl = await userService.uploadAvatar(userSession.user.id, file, profileData.email);
-      setProfileData(prev => ({ ...prev, avatar_url: publicUrl }));
-      showToast('Avatar atualizado com sucesso!');
-      if (onProfileUpdate) onProfileUpdate();
+      // Clean previous preview
+      if (avatarPreviewUrl) {
+        URL.revokeObjectURL(avatarPreviewUrl);
+      }
+
+      const preview = URL.createObjectURL(file);
+      setAvatarPreviewUrl(preview);
+      setSelectedAvatarFile(file);
+      setStagedRemoveAvatar(false);
+
+      showToast('Foto selecionada! Não esqueça de salvar as alterações.');
     } catch (err: any) {
-      console.error('Erro ao subir avatar:', err);
-      showToast(err.message || 'Erro ao atualizar avatar', 'error');
+      console.error('Erro ao processar imagem:', err);
+      showToast('Erro ao processar imagem', 'error');
     } finally {
-      setIsSaving(true); // Manter o overlay por um momento
-      setTimeout(() => setIsSaving(false), 500);
+      setIsSaving(false);
     }
   };
 
   const handleRemoveAvatar = async () => {
-    if (!userSession?.user?.id) return;
-    setIsSaving(true);
-    try {
-      await userService.removeAvatar(userSession.user.id);
-      setProfileData(prev => ({ ...prev, avatar_url: '' }));
-      showToast('Avatar removido com sucesso!');
-      if (onProfileUpdate) onProfileUpdate();
-    } catch (err: any) {
-      console.error('Erro ao remover avatar:', err);
-      showToast(err.message || 'Erro ao remover avatar', 'error');
-    } finally {
-      setIsSaving(false);
+    if (avatarPreviewUrl) {
+      URL.revokeObjectURL(avatarPreviewUrl);
     }
+    setAvatarPreviewUrl(null);
+    setSelectedAvatarFile(null);
+    setStagedRemoveAvatar(true);
+    showToast('Foto removida! Salve para confirmar.');
   };
 
   const handleSaveProfile = async () => {
@@ -232,23 +236,42 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ initialTab, on
     try {
       const fullName = `${profileData.nome} ${profileData.sobrenome}`.trim();
       const whatsappClean = cleanWhatsApp(profileData.whatsapp);
+      let currentAvatarUrl = profileData.avatar_url;
 
+      // 1. Handle Avatar Update/Removal if staged
+      if (selectedAvatarFile) {
+        const publicUrl = await userService.uploadAvatar(userSession.user.id, selectedAvatarFile, profileData.email);
+        currentAvatarUrl = publicUrl;
+        // Clean up
+        if (avatarPreviewUrl) URL.revokeObjectURL(avatarPreviewUrl);
+        setAvatarPreviewUrl(null);
+        setSelectedAvatarFile(null);
+      } else if (stagedRemoveAvatar) {
+        await userService.removeAvatar(userSession.user.id);
+        currentAvatarUrl = '';
+        setStagedRemoveAvatar(false);
+      }
+
+      // 2. Update Profile Record
       const { error } = await userService.updateProfile(userSession.user.id, {
         full_name: fullName,
         whatsapp: whatsappClean, // Salva apenas números
         email: userSession.user.email,
+        avatar_url: currentAvatarUrl, // PERSIST AVATAR URL
         updated_at: new Date().toISOString()
       });
       if (error) throw error;
 
-      // Atualiza metadados do Auth também para manter sincronizado
+      // 3. Atualiza metadados do Auth também para manter sincronizado
       await supabase.auth.updateUser({
         data: {
           full_name: fullName,
-          whatsapp: whatsappClean // Salva apenas números
+          whatsapp: whatsappClean, // Salva apenas números
+          avatar_url: currentAvatarUrl || null
         }
       });
 
+      setProfileData(prev => ({ ...prev, avatar_url: currentAvatarUrl }));
       showToast('Perfil atualizado com sucesso!');
       if (onProfileUpdate) onProfileUpdate();
     } catch (err: any) {
@@ -374,7 +397,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ initialTab, on
     { id: 'empresa' as SettingsTab, label: 'Empresa', icon: 'ph-buildings' },
     { id: 'equipe' as SettingsTab, label: 'Equipe', icon: 'ph-users-three' },
     { id: 'senha' as SettingsTab, label: 'Alterar Senha', icon: 'ph-lock' },
-    { id: 'planos' as SettingsTab, label: 'Planos e Consumo', icon: 'ph-stack' },
+    { id: 'planos' as SettingsTab, label: 'Planos', icon: 'ph-stack' },
     { id: 'logout' as SettingsTab, label: 'Sair do Painel', icon: 'ph-sign-out' },
   ];
 
@@ -399,7 +422,10 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ initialTab, on
               <div className="box-border flex flex-col items-start p-6 gap-8 w-full bg-[#F8F6F6] border border-[#DDDDD5] shadow-small rounded-[16px]">
                 <div className="flex flex-col sm:flex-row items-center gap-6 w-full">
                   <div className="relative w-[100px] h-[100px] rounded-2xl overflow-hidden border-2 border-white shadow-small flex-none">
-                    <img src={profileData.avatar_url || `https://ui-avatars.com/api/?name=${profileData.nome}+${profileData.sobrenome}&background=09B86D&color=fff&size=128`} className="w-full h-full object-cover" />
+                    <img
+                      src={avatarPreviewUrl || profileData.avatar_url || `https://ui-avatars.com/api/?name=${profileData.nome}+${profileData.sobrenome}&background=09B86D&color=fff&size=128`}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                   <div className="flex flex-col gap-2">
                     <div className="flex gap-2">
@@ -414,11 +440,11 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ initialTab, on
                         variant="secondary"
                         className="!h-[32px] !text-tag font-bold"
                         onClick={() => fileInputRef.current?.click()}
-                        isLoading={isSaving && profileData.avatar_url === ''}
+                        isLoading={isSaving && selectedAvatarFile !== null}
                       >
                         Alterar Foto
                       </Button>
-                      {profileData.avatar_url && (
+                      {(profileData.avatar_url || avatarPreviewUrl) && (
                         <Button
                           variant="danger-light"
                           className="!h-[32px] !text-tag font-bold"

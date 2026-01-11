@@ -6,6 +6,7 @@ import { GuideTourModal } from './components/GuideTourModal';
 import { Order, Product } from './types';
 import { supabase } from './lib/supabase';
 import { userService, companiesService, plansService, ordersService } from './lib/services';
+import { getUserCompanyId } from './lib/supabase';
 
 // Lazy loaded components para melhor performance de carregamento inicial
 const Home = lazy(() => import('./components/Home').then(m => ({ default: m.Home })));
@@ -26,6 +27,7 @@ const AcceptInvitePage = lazy(() => import('./components/AcceptInvitePage').then
 const ResetPasswordPage = lazy(() => import('./components/ResetPasswordPage').then(m => ({ default: m.ResetPasswordPage })));
 const DesignSystemPage = lazy(() => import('./components/DesignSystemPage').then(m => ({ default: m.default })));
 const OrderTracking = lazy(() => import('./components/OrderTracking'));
+const NewOrder = lazy(() => import('./components/NewOrder').then(m => ({ default: m.NewOrder })));
 
 const LoadingState = () => (
   <div className="min-h-screen w-full bg-neutral-25 flex flex-col items-center justify-center p-6 gap-4">
@@ -79,6 +81,8 @@ const App: React.FC = () => {
   const [selectedProductForView, setSelectedProductForView] = useState<Product | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [settingsInitialTab, setSettingsInitialTab] = useState<any>(undefined);
+
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
 
   // Inicialização: Verifica Sessão
   useEffect(() => {
@@ -166,14 +170,22 @@ const App: React.FC = () => {
       if (!session?.user?.id) return;
 
       try {
-        const { data: company } = await companiesService.getMyCompany(session.user.id);
-        if (!company) return;
+        const companyId = await getUserCompanyId();
+        if (!companyId) {
+          console.warn('[App] Company ID not found for badges');
+          return;
+        }
 
-        const companyId = company.id;
+        console.log('[App] Setting up order count for company:', companyId);
 
         // Fetch inicial
-        const { count } = await ordersService.getNewOrdersCount(companyId);
-        setNewOrdersCount(count);
+        const { count, error: fetchError } = await ordersService.getNewOrdersCount(companyId);
+        if (fetchError) {
+          console.error('[App] Error fetching new orders count:', fetchError);
+        } else {
+          console.log('[App] New orders count fetched:', count);
+          setNewOrdersCount(count || 0);
+        }
 
         // Inscrição em tempo real
         channel = supabase
@@ -186,12 +198,37 @@ const App: React.FC = () => {
               table: 'orders',
               filter: `company_id=eq.${companyId}`,
             },
-            async () => {
+            async (payload) => {
+              console.log('[App] Realtime event received:', payload);
+
+              // Tocar som se for um novo pedido (INSERT)
+              if (payload.eventType === 'INSERT') {
+                console.log('[App] Valid INSERT event detected. Attempting to play sound...');
+                try {
+                  const audio = new Audio('/sounds/notification.wav');
+                  audio.volume = 1.0;
+                  console.log('[App] Audio object created:', audio);
+
+                  const playPromise = audio.play();
+                  if (playPromise !== undefined) {
+                    playPromise
+                      .then(() => console.log('[App] Sound played successfully.'))
+                      .catch((error) => console.error('[App] Error playing sound (Autoplay blocked?):', error));
+                  }
+                } catch (e) {
+                  console.error('[App] Critical error initializing audio:', e);
+                }
+              } else {
+                console.log('[App] Event type is not INSERT:', payload.eventType);
+              }
+
               const { count: updatedCount } = await ordersService.getNewOrdersCount(companyId);
-              setNewOrdersCount(updatedCount);
+              setNewOrdersCount(updatedCount || 0);
             }
           )
-          .subscribe();
+          .subscribe((status) => {
+            console.log('[App] Sidebar real-time status:', status);
+          });
       } catch (err) {
         console.error('Erro ao gerenciar contagem de pedidos:', err);
       }
@@ -199,10 +236,18 @@ const App: React.FC = () => {
 
     setupOrderCount();
 
+    // Debug helper
+    (window as any).testSound = () => {
+      console.log('[App] Manual sound test triggered');
+      const audio = new Audio('/sounds/notification.wav');
+      audio.play().catch(e => console.error('[App] Manual test error:', e));
+    };
+
     return () => {
       if (channel) {
         supabase.removeChannel(channel);
       }
+      delete (window as any).testSound;
     };
   }, [session]);
 
@@ -345,7 +390,14 @@ const App: React.FC = () => {
           <div className="w-full h-full bg-white border border-neutral-200 shadow-cards rounded-[12px] sm:rounded-[16px] overflow-hidden">
             <Suspense fallback={<LoadingState />}>
               <Routes>
-                <Route path="/" element={<Home onOrderSelect={(order) => navigate(`/pedidos/${order.id}`)} onOpenSidebar={() => setIsSidebarOpen(true)} />} />
+                <Route path="/" element={<Home
+                  onOrderSelect={(order) => navigate(`/pedidos/${order.id}`)}
+                  onOpenSidebar={() => setIsSidebarOpen(true)}
+                  onNewOrder={() => { setEditingOrder(null); navigate('/pedidos/novo'); }}
+                  onEditOrder={(order) => { navigate(`/pedidos/editar/${order.id}`); }}
+                />} />
+                <Route path="/pedidos/novo" element={<NewOrder onBack={() => navigate('/')} />} />
+                <Route path="/pedidos/editar/:id" element={<NewOrder onBack={() => navigate(-1)} />} />
                 <Route path="/pedidos/:id" element={<OrderDetails onBack={() => navigate('/')} />} />
                 <Route path="/vendedor-ia" element={<VendedorIA />} />
                 <Route path="/funil-vendas" element={<FunilVendas />} />

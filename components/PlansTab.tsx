@@ -11,7 +11,7 @@ type BillingCycle = 'monthly' | 'quarterly' | 'semiannual' | 'annual';
 
 export const PlansTab: React.FC<PlansTabProps> = ({ onCancelClick }) => {
     const [plans, setPlans] = useState<Plan[]>([]);
-    const [subscription, setSubscription] = useState<Subscription | null>(null);
+    const [subscription, setSubscription] = useState<(Subscription & { plan: Plan }) | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -39,12 +39,18 @@ export const PlansTab: React.FC<PlansTabProps> = ({ onCancelClick }) => {
     // Helper to get features list from any Pro plan (assuming consistent features across cycles)
     const getProFeatures = () => {
         const pro = plans.find(p => p.name !== 'Gratuito');
-        return pro?.features || [
-            'Vendedor IA Ilimitado',
-            'Funil de Vendas Completo',
-            'Gestão de Clientes e Produtos',
-            'Suporte Prioritário',
-            'Dashboard Avançado'
+        return [
+            'Até 10 Usuários',
+            'Até 600 Produtos',
+            'Agente Vendedor IA',
+            'Agente Funil de Vendas (Em Breve)',
+            'Agente de Campanhas (Em Breve)',
+            'Clientes Ilimitados',
+            'Pedidos Ilimitados',
+            'Funis de Venda Ilimitados',
+            'CRM KanBan',
+            'Agente de Suporte Estratégico',
+            'Aulas de Estratégias de Venda (Em Breve)'
         ];
     };
 
@@ -58,6 +64,8 @@ export const PlansTab: React.FC<PlansTabProps> = ({ onCancelClick }) => {
             priceDisplay: 'R$147',
             multiplier: null,
             description: 'Faturamento mensal',
+            icon: 'ph-rocket',
+            iconBg: 'bg-neutral-800',
             highlight: false
         },
         {
@@ -66,6 +74,8 @@ export const PlansTab: React.FC<PlansTabProps> = ({ onCancelClick }) => {
             priceDisplay: 'R$127',
             multiplier: '6x',
             description: 'Faturamento semestral',
+            icon: 'ph-crown',
+            iconBg: 'bg-primary-600',
             highlight: true
         },
         {
@@ -74,6 +84,8 @@ export const PlansTab: React.FC<PlansTabProps> = ({ onCancelClick }) => {
             priceDisplay: 'R$97',
             multiplier: '12x',
             description: 'Faturamento anual',
+            icon: 'ph-star',
+            iconBg: 'bg-[#042522]',
             highlight: false
         }
     ];
@@ -110,17 +122,12 @@ export const PlansTab: React.FC<PlansTabProps> = ({ onCancelClick }) => {
                         </h5>
 
                         <div className="flex items-center gap-4">
-                            {isTrial && (
-                                <span className="text-body2 font-bold text-amber-500">Período de Testes</span>
-                            )}
-                            {subscription && (
-                                <button
-                                    onClick={onCancelClick}
-                                    className="text-body2 font-bold text-system-error-500 hover:text-system-error-700 transition-colors"
-                                >
-                                    Cancelar Assinatura
-                                </button>
-                            )}
+                            <button
+                                onClick={onCancelClick}
+                                className="text-body2 font-bold text-system-error-500 hover:text-system-error-700 transition-colors"
+                            >
+                                Cancelar Assinatura
+                            </button>
                         </div>
                     </div>
 
@@ -131,7 +138,7 @@ export const PlansTab: React.FC<PlansTabProps> = ({ onCancelClick }) => {
                                 <i className="ph ph-credit-card text-white text-[24px]"></i>
                             </div>
                             <div className="flex flex-col items-start gap-[3px] flex-grow">
-                                <span className="text-[11px] font-medium uppercase tracking-[0.02em] text-[#686864] leading-[18px]">Cartão</span>
+                                <span className="text-[11px] font-medium text-[#686864] leading-[18px]">Cartão</span>
                                 <span className="text-[18px] font-bold text-[#1F1F1E] leading-[120%]">**** **** **** 4242</span>
                             </div>
                             <Button
@@ -147,58 +154,48 @@ export const PlansTab: React.FC<PlansTabProps> = ({ onCancelClick }) => {
                                 <i className="ph ph-credit-card text-white text-[24px]"></i>
                             </div>
                             <div className="flex flex-col items-start gap-[1px] flex-grow">
-                                <span className="text-[11px] font-medium uppercase tracking-[0.02em] text-[#686864] leading-[18px]">Método de Pagamento</span>
+                                <span className="text-body2 font-medium text-[#686864] leading-[18px]">Método de Pagamento</span>
                                 <span className="text-body2 text-neutral-500">Nenhum cartão vinculado</span>
                             </div>
                         </div>
                     )}
 
                     {/* Estatísticas / Limites (DYNAMIC VALUES PRESERVED) */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-                        {/* Box 1: Pedidos Mensais */}
-                        <div className="flex flex-row items-center p-3 gap-3 w-full bg-[#F4F4F1] border border-[#DDDDD5] shadow-small rounded-[12px] h-[68px]">
-                            <div className="flex flex-row justify-center items-center w-[44px] h-[44px] bg-[#042522] rounded-[8px] flex-none">
-                                <i className="ph ph-shopping-cart text-white text-[24px]"></i>
+                    <div className="flex flex-col gap-4 w-full">
+                        <div className="flex flex-col p-5 gap-5 w-full bg-[#F4F4F1] border border-[#DDDDD5] shadow-small rounded-[12px]">
+                            <div className="flex flex-row items-center justify-between w-full">
+                                <div className="flex flex-row items-center gap-4">
+                                    <div className="flex flex-row justify-center items-center w-[48px] h-[48px] bg-[#042522] rounded-[10px] flex-none shadow-sm">
+                                        <i className="ph ph-package text-white text-[28px]"></i>
+                                    </div>
+                                    <div className="flex flex-col items-start gap-0.5">
+                                        <span className="text-body2 font-medium text-[#686864] leading-tight">Produtos Cadastrados</span>
+                                        <span className="text-[20px] font-black text-[#1F1F1E] leading-none">
+                                            251 <span className="text-[14px] font-bold text-neutral-400">/ {activePlan?.max_products === -1 ? '600' : (activePlan?.max_products || 600)}</span>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex flex-col items-end gap-0.5">
+                                    <span className="text-body2 font-medium text-neutral-400">Uso do Limite</span>
+                                    <span className="text-[20px] font-black text-primary-600 leading-none">
+                                        {Math.round((251 / (activePlan?.max_products === -1 ? 600 : (activePlan?.max_products || 600))) * 100)}%
+                                    </span>
+                                </div>
                             </div>
-                            <div className="flex flex-col items-start gap-[3px] flex-grow">
-                                <span className="text-[11px] font-medium uppercase tracking-[0.02em] text-[#686864] leading-[18px]">Pedidos Mensais</span>
-                                <span className="text-[18px] font-bold text-[#1F1F1E] leading-[120%]">
-                                    151 de {activePlan?.max_orders === -1 ? 'Ilimitado' : activePlan?.max_orders}
-                                </span>
+
+                            {/* Progress Bar */}
+                            <div className="flex flex-col gap-2 w-full">
+                                <div className="w-full h-3 bg-white border border-[#DDDDD5] rounded-full overflow-hidden shadow-inner">
+                                    <div
+                                        className="h-full bg-primary-600 rounded-full transition-all duration-1000 ease-out"
+                                        style={{ width: `${Math.min(100, (251 / (activePlan?.max_products === -1 ? 600 : (activePlan?.max_products || 600))) * 100)}%` }}
+                                    ></div>
+                                </div>
                             </div>
                         </div>
-
-                        {/* Box 2: Produtos Cadastrados */}
-                        <div className="flex flex-row items-center p-3 gap-3 w-full bg-[#F4F4F1] border border-[#DDDDD5] shadow-small rounded-[12px] h-[68px]">
-                            <div className="flex flex-row justify-center items-center w-[44px] h-[44px] bg-[#042522] rounded-[8px] flex-none">
-                                <i className="ph ph-package text-white text-[24px]"></i>
-                            </div>
-                            <div className="flex flex-col items-start gap-[3px] flex-grow">
-                                <span className="text-[11px] font-medium uppercase tracking-[0.02em] text-[#686864] leading-[18px]">Produtos Cadastrados</span>
-                                <span className="text-[18px] font-bold text-[#1F1F1E] leading-[120%]">
-                                    251 de {activePlan?.max_products === -1 ? 'Ilimitado' : activePlan?.max_products}
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Box 3: Clientes */}
-                        <div className="flex flex-row items-center p-3 gap-3 w-full bg-[#F4F4F1] border border-[#DDDDD5] shadow-small rounded-[12px] h-[68px]">
-                            <div className="flex flex-row justify-center items-center w-[44px] h-[44px] bg-[#042522] rounded-[8px] flex-none">
-                                <i className="ph ph-users text-white text-[24px]"></i>
-                            </div>
-                            <div className="flex flex-col items-start gap-[3px] flex-grow">
-                                <span className="text-[11px] font-medium uppercase tracking-[0.02em] text-[#686864] leading-[18px]">Clientes</span>
-                                <span className="text-[18px] font-bold text-[#1F1F1E] leading-[120%]">
-                                    1 de {activePlan?.max_clients === -1 ? 'Ilimitado' : activePlan?.max_clients}
-                                </span>
-                            </div>
-                        </div>
-
                     </div>
                 </div>
             </div>
-
 
             {/* SEÇÃO 2: PLANOS DISPONÍVEIS */}
             <div className="box-border flex flex-col items-center p-6 gap-6 w-full bg-[#F8F6F6] border border-[#DDDDD5] rounded-[12px]">
@@ -208,16 +205,16 @@ export const PlansTab: React.FC<PlansTabProps> = ({ onCancelClick }) => {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full max-w-[1000px]">
                     {pricingOptions.map((option) => (
-                        <div key={option.id} className="box-border flex flex-col items-start p-4 gap-4 w-full bg-white border border-[#DDDDD5] shadow-small rounded-[12px] h-full min-h-[360px] relative overflow-hidden group hover:border-primary-300 transition-all">
+                        <div key={option.id} className={`box-border flex flex-col items-start p-4 gap-4 w-full bg-white border shadow-small rounded-[12px] h-full min-h-[360px] relative overflow-hidden group transition-all ${option.highlight ? 'border-primary-500 ring-1 ring-primary-100' : 'border-[#DDDDD5] hover:border-neutral-300'}`}>
 
                             {/* Pro Tag/Icon */}
                             <div className="flex flex-row items-center gap-4 w-full h-[44px]">
-                                <div className="flex flex-row items-start p-[10px] gap-[10px] w-[44px] h-[44px] bg-[#046B62] rounded-[8px] flex-none">
-                                    <i className="ph ph-crown text-white text-[24px]"></i>
+                                <div className={`flex flex-row justify-center items-center w-[44px] h-[44px] ${option.iconBg} rounded-[8px] flex-none shadow-sm`}>
+                                    <i className={`ph ${option.icon} text-white text-[24px]`}></i>
                                 </div>
                                 <div className="flex flex-col justify-center items-start w-full">
                                     <span className="text-[15px] font-semibold text-[#01040E] leading-[140%]">Pro {option.title}</span>
-                                    <span className="text-[13px] font-normal text-[#2C2C2A] leading-[140%]">{option.description}</span>
+                                    <span className="text-[13px] font-normal text-[#686863] leading-[140%]">{option.description}</span>
                                 </div>
                             </div>
 
@@ -225,11 +222,11 @@ export const PlansTab: React.FC<PlansTabProps> = ({ onCancelClick }) => {
 
                             <div className="flex flex-col justify-between items-start gap-6 w-full h-full flex-1">
                                 <div className="flex flex-col items-start gap-6 w-full">
-                                    <div className="flex flex-row items-center gap-1 h-[29px]">
+                                    <div className="flex flex-row items-baseline gap-1">
                                         {option.multiplier && (
-                                            <span className="text-[24px] font-bold text-[#01040E] leading-[120%] opacity-60 mr-1">{option.multiplier}</span>
+                                            <span className="text-h4 font-bold text-neutral-400 mr-1">{option.multiplier}</span>
                                         )}
-                                        <span className="text-[28px] font-bold text-primary-600 leading-[120%]">{option.priceDisplay}</span>
+                                        <span className="text-h4 font-bold text-neutral-black">{option.priceDisplay}</span>
                                     </div>
 
                                     <div className="flex flex-col items-start gap-3 w-full">
@@ -253,6 +250,6 @@ export const PlansTab: React.FC<PlansTabProps> = ({ onCancelClick }) => {
                     ))}
                 </div>
             </div>
-        </div>
+        </div >
     );
 };

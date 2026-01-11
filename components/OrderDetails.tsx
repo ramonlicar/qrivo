@@ -16,6 +16,8 @@ import { CustomerSelectionModal } from './CustomerSelectionModal';
 import { Customer, User, OrderActivity } from '../types';
 import { Dropdown } from './Dropdown';
 import { userService, teamService, companiesService } from '../lib/services';
+import { ConfirmDeleteOrderModal } from './ConfirmDeleteOrderModal';
+import { useNavigate } from 'react-router-dom';
 
 const ORDER_STATUS_MAP: Record<string, { label: string; variant: 'error' | 'success' | 'warning' | 'neutral' | 'purple' }> = {
   'new': { label: 'Novo', variant: 'error' },
@@ -66,6 +68,7 @@ interface OrderDetailsProps {
 
 export const OrderDetails: React.FC<OrderDetailsProps> = ({ order: initialOrder, onBack }) => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [localOrder, setLocalOrder] = useState<Order | null>(initialOrder || null);
 
   const [isLoading, setIsLoading] = useState(!initialOrder || (initialOrder && initialOrder.id !== id));
@@ -76,6 +79,8 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ order: initialOrder,
   const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
   const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
   const [isCustomerSelectionModalOpen, setIsCustomerSelectionModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '' });
 
   const [teamMembers, setTeamMembers] = useState<User[]>([]);
@@ -467,6 +472,25 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ order: initialOrder,
     }
   };
 
+  const handleDeleteOrder = async () => {
+    if (!localOrder) return;
+    setIsDeleting(true);
+    try {
+      const { error } = await ordersService.deleteOrder(localOrder.id);
+      if (error) throw error;
+      showToast('Pedido excluído com sucesso!');
+      setTimeout(() => {
+        onBack();
+      }, 1000);
+    } catch (err) {
+      console.error('Error deleting order:', err);
+      showToast('Erro ao excluir pedido.');
+    } finally {
+      setIsDeleting(false);
+      setIsDeleteModalOpen(false);
+    }
+  };
+
   const handleResponsibleSelect = async (userId: string) => {
     setLocalOrder(prev => ({ ...prev!, responsible_id: userId, updated_at: new Date().toISOString() }));
     try {
@@ -522,6 +546,12 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ order: initialOrder,
           </div>
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
+          <Button
+            variant="secondary"
+            leftIcon="ph ph-pencil-simple"
+            className="!h-[36px] !px-3"
+            onClick={() => navigate(`/pedidos/editar/${localOrder.id}`)}
+          />
           {localOrder.order_status === 'new' || localOrder.order_status === 'NOVO' ? (
             <>
               <Button variant="secondary" className="w-[114px] sm:flex-none !h-[36px]" onClick={() => setIsArchiveModalOpen(true)}>Arquivar</Button>
@@ -614,15 +644,8 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ order: initialOrder,
                   <div className="flex flex-col flex-1">
                     <span className="text-body2 font-medium text-neutral-500 mb-1">Endereço Completo</span>
                     <p className="text-body2 font-bold text-neutral-black leading-tight">
-                      {[
-                        localOrder.shipping_address?.street,
-                        localOrder.shipping_address?.number,
-                        localOrder.shipping_address?.city && localOrder.shipping_address?.state ? `${localOrder.shipping_address.city} - ${localOrder.shipping_address.state}` : localOrder.shipping_address?.city
-                      ].filter(Boolean).join(', ') || 'Endereço não informado'}
+                      {localOrder.shipping_address || 'Endereço não informado'}
                     </p>
-                    {localOrder.shipping_address?.zipCode && (
-                      <p className="text-body2 font-medium text-neutral-500">CEP: {localOrder.shipping_address.zipCode}</p>
-                    )}
                   </div>
                 </div>
 
@@ -634,8 +657,7 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ order: initialOrder,
                   <div className="flex flex-col flex-1">
                     <span className="text-body2 font-medium text-neutral-500 mb-1">Opção de Entrega</span>
                     <p className="text-body2 font-bold text-neutral-black leading-tight">
-                      {localOrder.delivery_estimate || 'Padrão'}
-                      {localOrder.time_preference && <span className="text-neutral-500 font-normal"> • {localOrder.time_preference}</span>}
+                      {localOrder.delivery_area?.name || 'Não informado'}
                     </p>
                   </div>
                 </div>
@@ -779,7 +801,10 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ order: initialOrder,
               <h3 className="text-h2 font-bold text-neutral-black mb-4">{localOrder.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</h3>
               <div className="flex flex-col gap-3">
                 <div className="flex justify-between items-center text-body2 font-medium text-neutral-500"><span>Subtotal</span><span className="text-neutral-black font-bold">{localOrder.subtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
-                <div className="flex justify-between items-center text-body2 font-medium text-neutral-500"><span>Taxa de Entrega</span><span className="text-primary-600 font-bold">{localOrder.shipping_fee === 0 ? 'Grátis' : localOrder.shipping_fee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
+                <div className="flex justify-between items-center text-body2 font-medium text-neutral-500">
+                  <span>Taxa de Entrega {localOrder.delivery_area?.name ? `(${localOrder.delivery_area.name})` : ''}</span>
+                  <span className="text-primary-600 font-bold">{localOrder.shipping_fee === 0 ? 'Grátis' : localOrder.shipping_fee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                </div>
               </div>
             </div>
 
@@ -887,6 +912,18 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ order: initialOrder,
                 </div>
               </div>
             </div>
+
+            {/* Ações Secundárias */}
+            <div className="px-2 mt-2">
+              <Button
+                variant="ghost"
+                className="!text-danger-600 hover:!text-danger-700 !h-auto !p-0 !bg-transparent hover:!bg-transparent !justify-start w-fit group"
+                onClick={() => setIsDeleteModalOpen(true)}
+                leftIcon="ph ph-trash"
+              >
+                Excluir Pedido
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -934,6 +971,13 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ order: initialOrder,
         isOpen={isCustomerSelectionModalOpen}
         onClose={() => setIsCustomerSelectionModalOpen(false)}
         onSelect={handleCustomerSelect}
+      />
+
+      <ConfirmDeleteOrderModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleDeleteOrder}
+        isDeleting={isDeleting}
       />
     </div>
   );

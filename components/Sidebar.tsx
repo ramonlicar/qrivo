@@ -102,7 +102,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
 
           {/* Navigation Groups */}
-          <nav className={`w-full flex flex-col items-center overflow-y-auto no-scrollbar flex-1 ${isCollapsed ? 'space-y-1' : 'space-y-6 mt-4'}`}>
+          <nav className={`w-full flex flex-col items-center overflow-y-auto no-scrollbar flex-1 py-2 ${isCollapsed ? 'space-y-1' : 'space-y-6 mt-4'}`}>
             {NAVIGATION_SECTIONS.map((section) => (
               <div key={section.title} className="w-full">
                 {!isCollapsed && (
@@ -118,7 +118,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <SidebarTooltip label={item.label} active={isCollapsed}>
                           <button
                             onClick={(e) => handleNavClick(e, item.path)}
-                            className={`flex items-center rounded-lg transition-all group border ${isCollapsed ? 'justify-center w-10 h-10 mx-auto' : 'gap-3 px-3 h-8 w-full'
+                            className={`flex items-center rounded-lg transition-all group border relative ${isCollapsed ? 'justify-center w-10 h-10 mx-auto' : 'gap-3 px-3 h-8 w-full'
                               } ${isActive
                                 ? 'bg-white shadow-small border-transparent'
                                 : 'border-transparent hover:bg-neutral-200'
@@ -137,7 +137,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full 
                                 bg-system-error-500 text-[10px] font-black text-white ml-auto
                                 animate-in zoom-in duration-300
-                                ${isCollapsed ? 'absolute -top-1 -right-1 shadow-sm' : ''}
+                                ${isCollapsed ? 'absolute -top-1 -right-1 shadow-sm z-50' : ''}
                               `}>
                                 {badges[item.label] > 99 ? '99+' : badges[item.label]}
                               </div>
