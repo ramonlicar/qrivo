@@ -95,7 +95,7 @@ export const PlansTab: React.FC<PlansTabProps> = ({ onCancelClick }) => {
     const activePlanName = isTrial ? 'Trial (Pro)' : activePlan?.name;
 
     return (
-        <div className="flex flex-col gap-6 w-full animate-in fade-in slide-in-from-bottom-4 duration-300 pb-10">
+        <div className="flex flex-col gap-6 w-full pb-10">
 
             {/* SEÇÃO 1: VISÃO GERAL (Preserved Layout & Dynamic Stats) */}
             <div className="box-border flex flex-col items-start p-4 gap-4 w-full bg-[#F4F4F1] border border-[#E8E8E3] shadow-small rounded-[12px]">

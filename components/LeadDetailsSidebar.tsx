@@ -320,7 +320,7 @@ export const LeadDetailsSidebar: React.FC<LeadDetailsSidebarProps> = ({
           {currentView === 'cart' && (
             <div className="flex flex-col gap-6 animate-in slide-in-from-right duration-300 pb-12">
               <div className="flex items-center justify-between">
-                <h5 className="text-body1 font-bold text-neutral-black">Itens de Interesse</h5>
+                <h5 className="text-body1 font-bold text-neutral-black">Itens do carrinho de compras</h5>
               </div>
 
               {isLoadingCart ? (
@@ -333,8 +333,8 @@ export const LeadDetailsSidebar: React.FC<LeadDetailsSidebarProps> = ({
                     <i className="ph ph-shopping-cart text-2xl"></i>
                   </div>
                   <div className="flex flex-col gap-1">
-                    <p className="text-body2 font-bold text-neutral-500">Carrinho vazio</p>
-                    <p className="text-small text-neutral-400 max-w-[200px]">Adicione itens que o cliente demonstrou interesse.</p>
+                    <p className="text-body2 font-bold text-neutral-500">Carrinho Vazio</p>
+                    <p className="text-small text-neutral-400 max-w-[200px]">O cliente não possui nenhum item de interesse pendente</p>
                   </div>
                 </div>
               ) : (

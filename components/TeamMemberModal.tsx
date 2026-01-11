@@ -19,8 +19,8 @@ interface TeamMemberModalProps {
 
 export const TeamMemberModal: React.FC<TeamMemberModalProps> = ({ isOpen, onClose, member, onSave, currentUserRole }) => {
   const [formData, setFormData] = useState({
-    first_name: '',
-    last_name: '',
+    firstName: 'Novo',
+    lastName: 'Membro',
     email: '',
     role: 'member' as 'admin' | 'member'
   });
@@ -46,16 +46,21 @@ export const TeamMemberModal: React.FC<TeamMemberModalProps> = ({ isOpen, onClos
 
   useEffect(() => {
     if (member) {
+      // Split full name if available
+      const names = (member.full_name || '').split(' ');
+      const first = names[0] || '';
+      const last = names.slice(1).join(' ') || '';
+
       setFormData({
-        first_name: member.first_name,
-        last_name: member.last_name,
+        firstName: first,
+        lastName: last,
         email: member.email,
         role: (member.role === 'admin' ? 'admin' : 'member') as any
       });
     } else {
       setFormData({
-        first_name: '',
-        last_name: '',
+        firstName: 'Novo',
+        lastName: 'Membro',
         email: '',
         role: 'member'
       });
@@ -63,8 +68,8 @@ export const TeamMemberModal: React.FC<TeamMemberModalProps> = ({ isOpen, onClos
   }, [member, isOpen]);
 
   const handleSave = async () => {
-    if (!formData.email || (!member && !formData.first_name)) {
-      alert("Preencha os campos obrigatórios");
+    if (!formData.email) {
+      alert("Preencha o e-mail");
       return;
     }
 
@@ -75,8 +80,15 @@ export const TeamMemberModal: React.FC<TeamMemberModalProps> = ({ isOpen, onClos
 
       if (member) {
         await teamService.updateMemberRole(member.id, companyId, formData.role);
+        // Note: Update name logic for existing members would be separate or added to updateMemberRole if desired
       } else {
-        const { error } = await teamService.inviteMember(formData.email, formData.role, companyId);
+        const { error } = await teamService.inviteMember(
+          formData.email,
+          formData.role,
+          companyId,
+          formData.firstName,
+          formData.lastName
+        );
         if (error) throw error;
       }
       onSave();
@@ -93,12 +105,16 @@ export const TeamMemberModal: React.FC<TeamMemberModalProps> = ({ isOpen, onClos
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={member ? "Editar Membro" : "Convidar novo colaborador"}
+      title={
+        member
+          ? <span className="text-body1 font-bold text-neutral-900">Editar Membro</span>
+          : <span className="text-body1 font-bold text-neutral-900">Convidar novo colaborador</span>
+      }
       maxWidth="480px"
       footer={
         <div className="flex gap-3">
-          <Button variant="secondary" className="flex-1 !h-[40px] font-bold" onClick={onClose}>Cancelar</Button>
-          <Button variant="primary" className="flex-1 !h-[40px] font-bold shadow-sm" onClick={handleSave} isLoading={isLoading}>
+          <Button variant="secondary" className="flex-1 !h-[36px] font-bold" onClick={onClose}>Cancelar</Button>
+          <Button variant="primary" className="flex-1 !h-[36px] font-bold shadow-sm" onClick={handleSave} isLoading={isLoading}>
             {member ? "Salvar Alterações" : "Enviar Convite"}
           </Button>
         </div>
@@ -114,31 +130,30 @@ export const TeamMemberModal: React.FC<TeamMemberModalProps> = ({ isOpen, onClos
         </div>
 
         <div className="flex flex-col gap-5">
-          {!member && (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-tag font-bold text-neutral-700 px-1">Nome</label>
-                <TextInput
-                  placeholder="Ex: Ana"
-                  value={formData.first_name}
-                  onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                  containerClassName="!h-[36px] !bg-white"
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-tag font-bold text-neutral-700 px-1">Sobrenome</label>
-                <TextInput
-                  placeholder="Ex: Costa"
-                  value={formData.last_name}
-                  onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                  containerClassName="!h-[36px] !bg-white"
-                />
-              </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[13px] font-medium text-neutral-900">Nome</label>
+              <TextInput
+                placeholder="Nome"
+                value={formData.firstName}
+                onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                containerClassName="!h-[36px] bg-white"
+              />
             </div>
-          )}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[13px] font-medium text-neutral-900">Sobrenome</label>
+              <TextInput
+                placeholder="Sobrenome"
+                value={formData.lastName}
+                onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                containerClassName="!h-[36px] bg-white"
+              />
+            </div>
+          </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-tag font-bold text-neutral-700 px-1">E-mail de acesso</label>
+            <label className="text-[13px] font-medium text-neutral-900">E-mail de acesso</label>
             <TextInput
               placeholder="exemplo@empresa.com"
               type="email"
@@ -151,7 +166,7 @@ export const TeamMemberModal: React.FC<TeamMemberModalProps> = ({ isOpen, onClos
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-tag font-bold text-neutral-700 px-1">Nível de acesso</label>
+            <label className="text-[13px] font-medium text-neutral-900">Nível de acesso</label>
             <Dropdown
               label="Cargo"
               value={formData.role}
@@ -162,14 +177,7 @@ export const TeamMemberModal: React.FC<TeamMemberModalProps> = ({ isOpen, onClos
           </div>
         </div>
 
-        {!member && (
-          <div className="p-4 bg-primary-50 rounded-xl border border-primary-100 flex items-start gap-3">
-            <i className="ph ph-info ph-bold text-primary-600 mt-0.5"></i>
-            <p className="text-[11px] text-primary-900 font-medium leading-tight italic">
-              O novo colaborador receberá um link seguro para definir sua senha e acessar o painel da empresa.
-            </p>
-          </div>
-        )}
+
       </div>
     </Modal>
   );

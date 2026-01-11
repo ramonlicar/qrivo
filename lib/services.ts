@@ -226,7 +226,7 @@ export const userService = {
     return { data, error };
   },
 
-  async uploadAvatar(userId: string, file: File) {
+  async uploadAvatar(userId: string, file: File, userEmail?: string) {
     const fileExt = file.name.split('.').pop();
     const fileName = `avatar.${fileExt}`;
     const filePath = `${userId}/${fileName}`;
@@ -246,13 +246,30 @@ export const userService = {
       .from('avatars')
       .getPublicUrl(filePath);
 
-    // 3. Update user record
+    // 3. Update user record (using upsert to ensure it works even if profile doesn't exist yet)
+    const updates: any = {
+      id: userId,
+      avatar_url: publicUrl,
+      updated_at: new Date().toISOString()
+    };
+
+    // Only add email to updates if provided (important for new records)
+    if (userEmail) {
+      updates.email = userEmail;
+    }
+
     const { error: updateError } = await supabase
       .from('users')
-      .update({ avatar_url: publicUrl, updated_at: new Date().toISOString() })
-      .eq('id', userId);
+      .upsert(updates)
+      .select()
+      .single();
 
     if (updateError) throw updateError;
+
+    // 4. Update Auth Metadata (to keep it in sync for session-based access)
+    await supabase.auth.updateUser({
+      data: { avatar_url: publicUrl }
+    });
 
     return publicUrl;
   },
@@ -268,6 +285,12 @@ export const userService = {
 
     // Note: We don't necessarily need to delete from storage if we use upsert, 
     // but we could list and remove for cleanup if desired.
+
+    // Update Auth Metadata
+    await supabase.auth.updateUser({
+      data: { avatar_url: null }
+    });
+
     return { success: true };
   }
 };
@@ -779,19 +802,22 @@ export const teamService = {
     return { error };
   },
 
-  async inviteMember(email: string, role: string, company_id: string) {
-    // Call RPC instead of Edge Function to avoid CORS/Connectivity issues
-    const { data, error } = await supabase.rpc('invite_member_secure', {
-      p_email: email,
-      p_role: role,
-      p_company_id: company_id
+  async inviteMember(email: string, role: string, company_id: string, firstName?: string, lastName?: string) {
+    const fullName = firstName && lastName ? `${firstName} ${lastName}`.trim() : undefined;
+
+    // Call Edge Function to handle secure invitation via Supabase Auth
+    const { data, error } = await supabase.functions.invoke('invite-user', {
+      body: {
+        email,
+        role,
+        company_id,
+        full_name: fullName
+      }
     });
 
     if (error) return { data: null, error };
+    // Edge functions return data directly, sometimes needing parsing or check for custom error props
     if (data?.error) return { data: null, error: new Error(data.error) };
-
-    // Note: Email dispatch is now handled by a database trigger (invitation-notifier)
-    // to ensure reliability even if the frontend call fails.
 
     return { data, error: null };
   },
@@ -873,7 +899,7 @@ export const productsService = {
     query = query.is('parent_id', null);
 
     if (filters?.category) {
-      query = query.eq('categories.name', filters.category);
+      query = query.eq('category_id', filters.category);
     }
 
     if (filters?.status) {

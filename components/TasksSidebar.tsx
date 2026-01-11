@@ -143,7 +143,7 @@ export const TasksSidebar: React.FC<TasksSidebarProps> = ({
             />
 
             {/* Sidebar */}
-            <div className="fixed right-0 top-0 h-full w-[450px] bg-white border-l border-neutral-200 z-[120] shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+            <div className="fixed right-0 top-0 h-full w-[600px] bg-white border-l border-neutral-200 z-[120] shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 h-[56px] bg-white border-b border-neutral-100 flex-none">
                     <div className="flex items-center gap-3">
@@ -255,7 +255,10 @@ export const TasksSidebar: React.FC<TasksSidebarProps> = ({
                                                 <div className="flex-1 flex flex-col gap-0.5 overflow-hidden">
                                                     <div className="flex items-center gap-2">
                                                         {task.due_date && (
-                                                            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-neutral-100 rounded text-[11px] font-mono font-bold text-neutral-500 flex-none capitalize">
+                                                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono font-bold flex-none capitalize ${!task.is_completed && new Date(task.due_date) < new Date()
+                                                                ? 'bg-red-50 text-red-600 border border-red-100' // Danger Light
+                                                                : 'bg-neutral-100 text-neutral-500'
+                                                                }`}>
                                                                 <i className="ph ph-clock text-xs"></i>
                                                                 {format(new Date(task.due_date), 'HH:mm')}
                                                             </div>

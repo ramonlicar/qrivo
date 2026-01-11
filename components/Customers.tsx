@@ -380,42 +380,40 @@ export const Customers: React.FC = () => {
 
         {/* Barra de Filtros */}
         <div className="flex flex-row items-center p-[12px_20px] lg:p-[12px_24px] gap-[16px] w-full bg-white border-t border-neutral-100">
-          <div className="flex flex-row flex-wrap items-center gap-[12px] flex-1 py-1 relative z-30">
+          <div className="flex flex-row items-center gap-[12px] flex-1 overflow-x-auto no-scrollbar py-1">
             <TextInput
-              placeholder="Pesquisar por nome, telefone ou email..."
+              placeholder="Pesquisar cliente..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               leftIcon="ph-magnifying-glass"
-              containerClassName="w-full max-w-[400px] shrink-0 !h-[36px]"
+              containerClassName="w-[280px] shrink-0 !h-[36px]"
             />
 
-            <div className="w-[180px] shrink-0">
-              <Dropdown
-                label="Filtrar por Tags"
-                value={tagFilter}
-                onChange={(val) => setTagFilter(val)}
-                options={allCompanyTags.map(t => ({ label: t.text, value: t.text, color: t.color }))}
-                leftIcon="ph-tag"
-              />
-            </div>
+            <Dropdown
+              label="Tags"
+              value={tagFilter}
+              onChange={setTagFilter}
+              options={allCompanyTags.map(t => ({ label: t.text, value: t.text, color: t.color }))}
+              className="min-w-[140px] shrink-0 h-[36px]"
+            />
 
-            {/* Status Filter - Moved here */}
-            <Select
+            <Dropdown
+              label="Status"
+              value={statusFilter === 'all' ? '' : statusFilter}
+              onChange={(val) => setStatusFilter(val || 'all')}
               options={[
-                { value: 'all', label: 'Todos os Status' },
-                { value: 'active', label: 'IA Ativa' },
-                { value: 'inactive', label: 'IA Inativa' }
+                { label: 'IA Ativa', value: 'active', color: 'bg-primary-500' },
+                { label: 'IA Inativa', value: 'inactive', color: 'bg-neutral-400' }
               ]}
-              value={statusFilter}
-              onChange={(val) => setStatusFilter(val as any)}
-              className="w-[180px] shrink-0"
+              className="min-w-[140px] shrink-0 h-[36px]"
+              allowClear={true}
             />
 
-            {(searchTerm || statusFilter !== 'all' || tagFilter !== '') && (
+            {(searchTerm || statusFilter !== 'all' || tagFilter !== '' || sortOrder !== 'name-asc') && (
               <Button
                 variant="danger-light"
                 onClick={clearFilters}
-                className="!h-[36px] rounded-md"
+                className="!h-[36px]"
                 leftIcon="ph ph-x-circle"
               >
                 Limpar
@@ -423,20 +421,22 @@ export const Customers: React.FC = () => {
             )}
           </div>
 
-          <div className="flex items-center gap-4 w-full sm:w-auto relative z-30">
-            {/* Sorting */}
-            <Select
-              options={[
-                { value: 'name-asc', label: 'Nome: A-Z' },
-                { value: 'name-desc', label: 'Nome: Z-A' },
-                { value: 'spent-highest', label: 'Maiores Valores' },
-                { value: 'spent-lowest', label: 'Menores Valores' },
-                { value: 'date-newest', label: 'Mais Recentes' },
-                { value: 'date-oldest', label: 'Mais Antigos' }
-              ]}
+          {/* Sort Layout Fixed to Right */}
+          <div className="flex-none pl-4 border-l border-neutral-100">
+            <Dropdown
+              label="Ordenar por"
               value={sortOrder}
-              onChange={(val) => setSortOrder(val as any)}
-              className="w-[180px] shrink-0"
+              onChange={setSortOrder}
+              options={[
+                { label: 'A-Z', value: 'name-asc' },
+                { label: 'Z-A', value: 'name-desc' },
+                { label: 'Mais Recentes', value: 'date-newest' },
+                { label: 'Mais Antigos', value: 'date-oldest' },
+                { label: 'Maior Valor', value: 'spent-highest' },
+                { label: 'Menor Valor', value: 'spent-lowest' }
+              ]}
+              className="min-w-[140px] shrink-0 h-[36px]"
+              align="right"
             />
           </div>
         </div>

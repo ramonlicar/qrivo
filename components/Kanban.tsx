@@ -471,6 +471,13 @@ export const Kanban: React.FC = () => {
       } else {
         if (originColId !== targetColId) {
           showToast(`Lead movido para ${targetCol.title}`);
+          // Log History with details
+          funnelsService.addLeadHistory(
+            card.id,
+            companyId || '',
+            'moved',
+            `Movido de "${sourceCol.title}" para "${targetCol.title}"`
+          );
         }
       }
     }

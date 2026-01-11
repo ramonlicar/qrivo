@@ -335,12 +335,10 @@ export const LeadCardModal: React.FC<LeadCardModalProps> = ({
 
     useEffect(() => {
         if (isOpen && card && companyId) {
-            if (activeTab === 'tasks') {
-                fetchTasks();
-            }
+            fetchTasks();
             setTags(card.tags || []);
         }
-    }, [isOpen, card, activeTab, companyId]);
+    }, [isOpen, card, companyId]);
 
     const fetchTasks = async () => {
         if (!card || !companyId) return;
@@ -854,7 +852,10 @@ export const LeadCardModal: React.FC<LeadCardModalProps> = ({
                                                     </button>
 
                                                     {task.due_date && (
-                                                        <span className="text-xs font-mono font-medium text-neutral-500 bg-neutral-100 px-1.5 py-0.5 rounded">
+                                                        <span className={`text-xs font-mono font-medium px-1.5 py-0.5 rounded border ${!task.is_completed && new Date(task.due_date) < new Date()
+                                                            ? 'bg-red-50 text-red-600 border-red-100 font-bold'
+                                                            : 'bg-neutral-100 text-neutral-500 border-transparent'
+                                                            }`}>
                                                             {new Date(task.due_date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                                         </span>
                                                     )}
@@ -944,7 +945,7 @@ export const LeadCardModal: React.FC<LeadCardModalProps> = ({
                                                         <i className="ph ph-file-text text-xl text-neutral-400 group-hover:text-primary-500 transition-colors"></i>
                                                     </div>
                                                     <div className="flex flex-col overflow-hidden">
-                                                        <span className="text-sm font-semibold text-neutral-900 truncate" title={file.name}>{file.name}</span>
+                                                        <span className="text-body2 font-semibold text-neutral-900 truncate" title={file.name}>{file.name}</span>
                                                         <span className="text-xs text-neutral-500 uppercase">{file.name.split('.').pop() || 'FILE'} • {(file.size / 1024).toFixed(0)} KB</span>
                                                     </div>
                                                 </div>

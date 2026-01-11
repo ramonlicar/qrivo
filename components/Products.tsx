@@ -23,7 +23,7 @@ export const Products: React.FC<ProductsProps> = ({ onEdit, onAddNew, onViewDeta
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [companyId, setCompanyId] = useState<string | null>(null);
-  const [categories, setCategories] = useState<string[]>([]);
+  const [categories, setCategories] = useState<{ id: string, name: string }[]>([]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -94,7 +94,7 @@ export const Products: React.FC<ProductsProps> = ({ onEdit, onAddNew, onViewDeta
 
       // Fetch categories
       const cats = await productsService.getCategories(companyId);
-      setCategories(cats.map((c: any) => c.name));
+      setCategories(cats.map((c: any) => ({ id: c.id, name: c.name })));
     } catch (error) {
       console.error('Error fetching products:', error);
       showToast('Erro ao carregar produtos.');
@@ -136,9 +136,7 @@ export const Products: React.FC<ProductsProps> = ({ onEdit, onAddNew, onViewDeta
     onEdit(product);
   };
 
-  const handleRefresh = () => {
-    fetchProducts();
-  };
+
 
   const tableGridClass = "grid grid-cols-[1fr_120px_180px_130px_120px_90px] items-center px-6";
 
@@ -159,7 +157,7 @@ export const Products: React.FC<ProductsProps> = ({ onEdit, onAddNew, onViewDeta
             <p className="hidden sm:block text-body2 font-normal text-neutral-500 m-0 truncate w-full">Organize seu catálogo de forma prática.</p>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="secondary" leftIcon="ph ph-arrows-clockwise" className="!h-[36px]" onClick={handleRefresh} disabled={isLoading}>Atualizar</Button>
+
             <Button variant="secondary" leftIcon="ph ph-upload-simple" className="hidden sm:flex !h-[36px]" onClick={() => setIsImportModalOpen(true)}>Importar</Button>
             <Button
               variant="secondary"
@@ -178,7 +176,7 @@ export const Products: React.FC<ProductsProps> = ({ onEdit, onAddNew, onViewDeta
               label="Categoria"
               value={categoryFilter}
               onChange={setCategoryFilter}
-              options={categories.map(c => ({ label: c, value: c }))}
+              options={categories.map((c: any) => ({ label: c.name, value: c.id }))}
               className="min-w-[140px] shrink-0 h-[36px]"
             />
             <Dropdown
@@ -191,6 +189,24 @@ export const Products: React.FC<ProductsProps> = ({ onEdit, onAddNew, onViewDeta
               ]}
               className="min-w-[120px] shrink-0 h-[36px]"
             />
+            {(searchTerm || categoryFilter || statusFilter) && (
+              <Button
+                variant="danger-light"
+                onClick={() => {
+                  setSearchTerm('');
+                  setCategoryFilter('');
+                  setStatusFilter('');
+                }}
+                className="!h-[36px]"
+                leftIcon="ph ph-x-circle"
+              >
+                Limpar
+              </Button>
+            )}
+          </div>
+
+          {/* Sort Layout Fixed to Right */}
+          <div className="flex-none pl-4 border-l border-neutral-100">
             <Dropdown
               label="Ordenar por"
               value={sortBy}
@@ -202,21 +218,8 @@ export const Products: React.FC<ProductsProps> = ({ onEdit, onAddNew, onViewDeta
                 { label: 'Maior Preço', value: 'PRICE_DESC' }
               ]}
               className="min-w-[140px] shrink-0 h-[36px]"
+              align="right"
             />
-            {(searchTerm || categoryFilter || statusFilter) && (
-              <Button
-                variant="tertiary"
-                onClick={() => {
-                  setSearchTerm('');
-                  setCategoryFilter('');
-                  setStatusFilter('');
-                }}
-                className="text-system-error-500 !h-[36px]"
-                leftIcon="ph ph-x-circle"
-              >
-                Limpar
-              </Button>
-            )}
           </div>
         </div>
       </div>

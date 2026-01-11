@@ -195,7 +195,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ initialTab, on
 
     setIsSaving(true);
     try {
-      const publicUrl = await userService.uploadAvatar(userSession.user.id, file);
+      const publicUrl = await userService.uploadAvatar(userSession.user.id, file, profileData.email);
       setProfileData(prev => ({ ...prev, avatar_url: publicUrl }));
       showToast('Avatar atualizado com sucesso!');
       if (onProfileUpdate) onProfileUpdate();
@@ -298,7 +298,8 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ initialTab, on
     setIsSaving(true);
     try {
       // 1. Re-autenticar para segurança
-      const { error: reauthError } = await supabase.auth.reauthenticate({
+      const { error: reauthError } = await supabase.auth.signInWithPassword({
+        email: userSession.user.email,
         password: passwordData.atual
       });
 
@@ -354,7 +355,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ initialTab, on
   }, [teamMembers, teamSearch]);
 
   const myMembership = useMemo(() => {
-    return teamMembers.find(m => m.user_id === userSession?.user?.id);
+    return teamMembers.find(m => m.id === userSession?.user?.id);
   }, [teamMembers, userSession?.user?.id]);
 
   const isCompanyOwner = userSession?.user?.id === empresaData.owner_user_id;
@@ -416,8 +417,8 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ initialTab, on
                       </Button>
                       {profileData.avatar_url && (
                         <Button
-                          variant="ghost"
-                          className="!h-[32px] !text-tag font-bold text-system-error-500"
+                          variant="danger-light"
+                          className="!h-[32px] !text-tag font-bold"
                           onClick={handleRemoveAvatar}
                         >
                           Remover
@@ -507,9 +508,29 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ initialTab, on
           <div className="flex flex-col gap-6 w-full animate-in fade-in slide-in-from-bottom-4 duration-300 pb-10">
             <div className="box-border flex flex-col items-start p-4 gap-4 w-full bg-[#F4F4F1] border border-[#E8E8E3] shadow-small rounded-[12px]">
               <div className="flex flex-row justify-between items-center w-full">
-                <h5 className="text-h5 font-bold text-[#09090B]">Gestão da Equipe</h5>
+                <div className="flex flex-col gap-1">
+                  <h5 className="text-h5 font-bold text-[#09090B]">Gestão da Equipe</h5>
+                  <span className="text-small text-neutral-500 font-medium">
+                    Sua empresa possui <strong className="text-neutral-900">{teamMembers.length} de 10</strong> assentos ocupados
+                  </span>
+                </div>
                 {canManageTeam && (
-                  <Button variant="primary" leftIcon="ph ph-plus" className="!h-[34px] px-6 font-bold shadow-sm" onClick={() => { setMemberToEdit(null); setIsTeamModalOpen(true); }}>Convidar Membro</Button>
+                  <Button
+                    variant="primary"
+                    leftIcon="ph ph-plus"
+                    className={`!h-[34px] px-6 font-bold shadow-sm ${teamMembers.length >= 10 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    onClick={() => {
+                      if (teamMembers.length < 10) {
+                        setMemberToEdit(null);
+                        setIsTeamModalOpen(true);
+                      } else {
+                        showToast('Limite de 10 membros atingido.', 'error');
+                      }
+                    }}
+                    disabled={teamMembers.length >= 10}
+                  >
+                    Convidar Membro
+                  </Button>
                 )}
               </div>
 
@@ -524,7 +545,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ initialTab, on
                   />
                 </div>
 
-                <div className="flex flex-col divide-y divide-neutral-100 min-h-[300px]">
+                <div className="flex flex-col divide-y divide-neutral-100">
                   {isLoading ? (
                     <div className="flex flex-col items-center justify-center flex-1 py-20 gap-4">
                       <div className="w-8 h-8 border-4 border-primary-100 border-t-primary-500 rounded-full animate-spin"></div>
@@ -565,30 +586,93 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ initialTab, on
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
-                          <Badge variant={ROLE_MAP[member.role]?.variant || 'neutral'}>
-                            {ROLE_MAP[member.role]?.label || member.role}
-                          </Badge>
+                          {(() => {
+                            // Permission Logic for Role Editing
+                            const isSelf = member.id === userSession?.user?.id;
+                            const isTargetOwner = member.role === 'owner';
+                            const isObserverMember = myMembership?.role === 'member';
+                            const isObserverAdmin = myMembership?.role === 'admin';
 
-                          {/* RBAC Action Logic */}
+                            // Rules:
+                            // 1. Member cannot edit anyone
+                            // 2. Admin cannot edit Owner
+                            // 3. Owner cannot edit self (role)
+                            // 4. Admin CAN edit Member
+
+                            let canEdit = false;
+
+                            if (canManageTeam && !isSelf) { // Must have basic management rights and not be self
+                              if (effectiveRole === 'owner') {
+                                canEdit = true; // Owner can edit anyone (except self, handled above)
+                              } else if (effectiveRole === 'admin') {
+                                canEdit = !isTargetOwner && member.role !== 'admin'; // Admin can only edit 'member', not 'owner' or other 'admin' (usually)
+                              }
+                            }
+
+                            if (canEdit) {
+                              const roleOptions = effectiveRole === 'owner'
+                                ? [
+                                  { label: 'Administrador', value: 'admin' },
+                                  { label: 'Membro', value: 'member' }
+                                ]
+                                : [
+                                  { label: 'Membro', value: 'member' }
+                                ]; // Admin can only set Member (or maybe promote? sticking to modal logic: Admin cannot create admins)
+
+                              // If admin can edit member, they usually can't change them TO admin if they can't create admins.
+                              // Re-using logic from TeamMemberModal:
+                              // if admin, options are all EXCEPT admin? No, "filter(opt => opt.value !== 'admin')".
+                              // This means Admin can ONLY see/set "member".
+
+                              return (
+                                <Dropdown
+                                  label={ROLE_MAP[member.role]?.label || member.role}
+                                  value={member.role}
+                                  options={roleOptions}
+                                  onChange={async (newRole) => {
+                                    if (newRole === member.role) return;
+
+                                    // Optimistic update or Load?
+                                    showToast('Atualizando permissão...', 'success');
+                                    try {
+                                      await teamService.updateMemberRole(member.id, empresaData.id, newRole);
+                                      showToast('Permissão atualizada!');
+                                      loadTeam();
+                                    } catch (err) {
+                                      showToast('Erro ao atualizar permissão', 'error');
+                                      loadTeam(); // Revert
+                                    }
+                                  }}
+                                  className="!h-[34px] w-[140px]"
+                                  showHeader={false}
+                                  allowClear={false}
+                                />
+                              );
+                            }
+
+                            // Fallback to Badge if cannot edit
+                            return (
+                              <Badge variant={ROLE_MAP[member.role]?.variant || 'neutral'}>
+                                {ROLE_MAP[member.role]?.label || member.role}
+                              </Badge>
+                            );
+                          })()}
+
+                          {/* RBAC Action Logic for Delete/Edit Buttons */}
                           {canManageTeam && (
                             <>
-                              {/* Can only edit if NOT self (owner/admin) and hierarchical rules apply */}
-                              {(myMembership?.user_id !== member.user_id) && (
+                              {/* Can only edit/delete if NOT self AND hierarchical rules apply */}
+                              {(myMembership?.id !== member.id) && (
                                 (myMembership?.role === 'owner' && member.role !== 'owner') ||
                                 (myMembership?.role === 'admin' && member.role !== 'owner' && member.role !== 'admin')
                               ) && (
                                   <>
                                     <IconButton
-                                      variant="edit"
-                                      icon="ph-pencil-simple"
-                                      onClick={() => { setMemberToEdit(member); setIsTeamModalOpen(true); }}
-                                      title="Editar"
-                                    />
-                                    <IconButton
                                       variant="delete"
                                       icon="ph-trash"
                                       onClick={() => { setMemberToDelete(member); setIsDeleteMemberModalOpen(true); }}
                                       title="Remover"
+                                      className="!w-[34px] !h-[34px]"
                                     />
                                   </>
                                 )}
@@ -613,8 +697,16 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ initialTab, on
                         <Button
                           variant="primary"
                           leftIcon="ph ph-plus"
-                          className="!h-[36px] px-8 font-bold mt-4"
-                          onClick={() => { setMemberToEdit(null); setIsTeamModalOpen(true); }}
+                          className={`!h-[36px] px-8 font-bold mt-4 ${teamMembers.length >= 10 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          onClick={() => {
+                            if (teamMembers.length < 10) {
+                              setMemberToEdit(null);
+                              setIsTeamModalOpen(true);
+                            } else {
+                              showToast('Limite de 10 membros atingido.', 'error');
+                            }
+                          }}
+                          disabled={teamMembers.length >= 10}
                         >
                           Convidar Primeiro Membro
                         </Button>
@@ -651,11 +743,11 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ initialTab, on
                   />
                   <div className="flex justify-start">
                     <Button
-                      variant="tertiary"
+                      variant="ghost"
                       className="!p-0 !h-auto text-[11px] font-bold text-neutral-400 hover:text-primary-600 transition-colors"
                       onClick={() => setIsForgotModalOpen(true)}
                     >
-                      Esqueci a senha?
+                      Esqueci a senha
                     </Button>
                   </div>
                 </div>
@@ -768,7 +860,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ initialTab, on
         onSave={() => { loadTeam(); setIsTeamModalOpen(false); setMemberToEdit(null); }}
         member={memberToEdit}
         companyId={empresaData.id}
-        currentUserRole={effectiveRole}
+        currentUserRole={effectiveRole as any}
       />
 
       <Modal
