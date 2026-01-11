@@ -551,6 +551,8 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ order: initialOrder,
             leftIcon="ph ph-pencil-simple"
             className="!h-[36px] !px-3"
             onClick={() => navigate(`/pedidos/editar/${localOrder.id}`)}
+            disabled={['delivered', 'ENTREGUE'].includes(localOrder.order_status)}
+            title={['delivered', 'ENTREGUE'].includes(localOrder.order_status) ? "Pedidos entregues não podem ser editados" : "Editar Pedido"}
           />
           {localOrder.order_status === 'new' || localOrder.order_status === 'NOVO' ? (
             <>

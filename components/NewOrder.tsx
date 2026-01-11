@@ -89,6 +89,11 @@ export const NewOrder: React.FC<NewOrderProps> = ({ onBack }) => {
                 const { data: fetchedOrder } = await ordersService.getOrderById(orderIdParam);
 
                 if (fetchedOrder) {
+                    if (['delivered', 'ENTREGUE'].includes(fetchedOrder.order_status)) {
+                        console.warn("Attempted to edit a delivered order. Redirecting...");
+                        navigate('/');
+                        return;
+                    }
                     setOrderCode(fetchedOrder.code);
                     if (fetchedOrder.customer_id) setSelectedCustomerId(fetchedOrder.customer_id);
                     if (fetchedOrder.responsible_id) setSelectedResponsibleId(fetchedOrder.responsible_id);

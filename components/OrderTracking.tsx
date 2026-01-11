@@ -34,6 +34,7 @@ export const OrderTracking: React.FC = () => {
     const [searchCode, setSearchCode] = useState('');
     const navigate = useNavigate();
 
+    // 1. Initial Data Fetch
     useEffect(() => {
         const fetchOrderData = async () => {
             if (!code) return;
@@ -41,59 +42,58 @@ export const OrderTracking: React.FC = () => {
             setError(null);
             try {
                 const { data: orderData, error: orderError } = await ordersService.getOrderByCode(code);
-                console.log('[OrderTracking] Fetch order result:', { data: orderData, error: orderError });
                 if (orderError || !orderData) {
-                    console.error('[OrderTracking] Order not found or error:', orderError);
                     throw new Error('Pedido não encontrado ou erro de acesso.');
                 }
                 setOrder(orderData);
 
-                const orderId = orderData.id;
-                console.log('[OrderTracking] Attempting to fetch order history for order ID:', orderId);
-                const { data: historyData, error: historyError } = await ordersService.getOrderHistory(orderId);
-                console.log('[OrderTracking] Fetch history result:', { data: historyData, error: historyError });
+                const { data: historyData } = await ordersService.getOrderHistory(orderData.id);
                 setHistory(historyData || []);
-
-                // Setup real-time subscription inside the success block to ensure we have the ID
-                console.log('[OrderTracking] Setting up real-time subscription for order ID:', orderId);
-                const channel = supabase
-                    .channel(`order-tracking-${orderId}`)
-                    .on(
-                        'postgres_changes',
-                        { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` },
-                        (payload) => {
-                            console.log('[OrderTracking] Real-time Order Update:', payload);
-                            setOrder(prev => prev ? { ...prev, ...(payload.new as Order) } : (payload.new as Order));
-                        }
-                    )
-                    .on(
-                        'postgres_changes',
-                        { event: 'INSERT', schema: 'public', table: 'order_history', filter: `order_id=eq.${orderId}` },
-                        (payload) => {
-                            console.log('[OrderTracking] Real-time History Insert:', payload);
-                            setHistory(prev => [payload.new as OrderActivity, ...prev]);
-                        }
-                    )
-                    .subscribe();
-
-                return () => {
-                    console.log('[OrderTracking] Cleaning up real-time subscription for order ID:', orderId);
-                    supabase.removeChannel(channel);
-                };
             } catch (err: any) {
                 console.error('[OrderTracking] Error during data fetch:', err);
                 setError(err.message);
             } finally {
                 setIsLoading(false);
-                console.log('[OrderTracking] Data fetching complete.');
             }
         };
 
-        const cleanup = fetchOrderData();
-        return () => {
-            cleanup.then(unsub => unsub && (typeof unsub === 'function') && unsub());
-        };
+        fetchOrderData();
     }, [code]);
+
+    // 2. Real-time Subscription management
+    useEffect(() => {
+        if (!order?.id) return;
+
+        const orderId = order.id;
+        console.log('[OrderTracking] Setting up real-time subscription for order ID:', orderId);
+
+        const channel = supabase
+            .channel(`order-tracking-${orderId}`)
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` },
+                (payload) => {
+                    console.log('[OrderTracking] Real-time Order Update:', payload);
+                    setOrder(prev => prev ? { ...prev, ...(payload.new as Order) } : (payload.new as Order));
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'order_history', filter: `order_id=eq.${orderId}` },
+                (payload) => {
+                    console.log('[OrderTracking] Real-time History Insert:', payload);
+                    setHistory(prev => [payload.new as OrderActivity, ...prev]);
+                }
+            )
+            .subscribe((status) => {
+                console.log(`[OrderTracking] Subscription status: ${status}`);
+            });
+
+        return () => {
+            console.log('[OrderTracking] Cleaning up real-time subscription for order ID:', orderId);
+            supabase.removeChannel(channel);
+        };
+    }, [order?.id]);
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();

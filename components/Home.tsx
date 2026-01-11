@@ -211,8 +211,7 @@ export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar, onNewO
           </div>
 
           <div className="flex items-center gap-3">
-            <IconButton icon="ph-arrows-clockwise" variant="neutral" onClick={loadOrders} className={isLoading ? 'animate-spin' : ''} title="Sincronizar" />
-            <Button variant="primary" className="!h-[36px] font-bold" leftIcon="ph ph-plus" onClick={onNewOrder}>Novo Pedido</Button>
+            <Button variant="primary" className="!h-[40px] font-bold shadow-sm" leftIcon="ph ph-plus" onClick={onNewOrder}>Novo Pedido</Button>
           </div>
         </div>
 
@@ -444,7 +443,8 @@ export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar, onNewO
                             variant="neutral"
                             size="sm"
                             onClick={(e) => { e.stopPropagation(); onEditOrder(order); }}
-                            title="Editar Pedido"
+                            disabled={['delivered', 'ENTREGUE'].includes(order.order_status)}
+                            title={['delivered', 'ENTREGUE'].includes(order.order_status) ? "Pedidos entregues não podem ser editados" : "Editar Pedido"}
                           />
                           <IconButton
                             icon="ph-trash"
