@@ -19,12 +19,15 @@ export interface Order {
   customer_name: string;
   customer_phone: string;
   customer_email?: string;
+  customer_id?: string;
+  responsible_id?: string;
   total: number;
   subtotal: number;
   shipping_fee: number;
   payment_status: 'PAGO' | 'PENDENTE' | 'CANCELADO' | 'REEMBOLSADO' | 'paid' | 'pending' | 'refunded' | 'canceled';
-  order_status: 'NOVO' | 'PREPARANDO' | 'ENTREGUE' | 'CANCELADO' | 'ARQUIVADO' | 'new' | 'preparing' | 'delivered' | 'archived';
+  order_status: 'NOVO' | 'PREPARANDO' | 'ENVIADO' | 'ENTREGUE' | 'CANCELADO' | 'ARQUIVADO' | 'new' | 'confirmed' | 'preparing' | 'shipped' | 'delivered' | 'archived';
   created_at: string;
+  updated_at?: string;
   shipping_address?: {
     street: string;
     number: string;
@@ -36,7 +39,18 @@ export interface Order {
   time_preference?: string;
   observations?: string;
   receipt_url?: string;
+  payment_method?: string;
   items?: OrderItem[];
+}
+
+export interface OrderActivity {
+  id: string;
+  order_id: string;
+  company_id: string;
+  action_type: string;
+  description: string;
+  created_at: string;
+  created_by?: string;
 }
 
 export interface ProductAttribute {

@@ -320,7 +320,7 @@ export const Products: React.FC<ProductsProps> = ({ onEdit, onAddNew, onViewDeta
           </div>
           <div className="flex items-center justify-between p-4 border-t border-neutral-100 bg-white">
             <span className="text-body2 font-medium text-neutral-500">
-              Exibindo <span className="font-bold text-neutral-black">{products.length}</span> de {totalCount}
+              Exibindo <span className="font-bold text-neutral-black">{products.length}</span> de <span className="font-bold text-neutral-black">{totalCount}</span> Resultado(s)
             </span>
             <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
           </div>

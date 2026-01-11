@@ -8,23 +8,25 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Badge } from './Badge';
 import { Dropdown } from './Dropdown';
+import { TextInput } from './TextInput';
 import { Pagination } from './Pagination';
 import { Button } from './Button';
 import { IconButton } from './IconButton';
 import { StatsCard } from './StatsCard';
 import { Order, Stats } from '../types';
 import { ordersService } from '../lib/services';
-import { getUserCompanyId } from '../lib/supabase';
+import { getUserCompanyId, supabase } from '../lib/supabase';
 
-const ORDER_STATUS_MAP: Record<string, { label: string; variant: 'error' | 'success' | 'warning' | 'neutral' }> = {
+const ORDER_STATUS_MAP: Record<string, { label: string; variant: 'error' | 'success' | 'warning' | 'neutral' | 'purple' }> = {
   'new': { label: 'Novo', variant: 'error' },
-  'preparing': { label: 'Preparando', variant: 'warning' },
-  'shipped': { label: 'Enviado', variant: 'warning' },
+  'confirmed': { label: 'Confirmado', variant: 'error' },
+  'preparing': { label: 'Em Separação', variant: 'warning' },
+  'shipped': { label: 'Em Entrega', variant: 'purple' },
   'delivered': { label: 'Entregue', variant: 'success' },
   'canceled': { label: 'Cancelado', variant: 'neutral' },
   'archived': { label: 'Arquivado', variant: 'neutral' },
   'NOVO': { label: 'Novo', variant: 'error' },
-  'PREPARANDO': { label: 'Preparando', variant: 'warning' },
+  'PREPARANDO': { label: 'Em Separação', variant: 'warning' },
   'ENTREGUE': { label: 'Entregue', variant: 'success' },
   'CANCELADO': { label: 'Cancelado', variant: 'neutral' },
   'ARQUIVADO': { label: 'Arquivado', variant: 'neutral' },
@@ -51,13 +53,11 @@ export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
+  const [sortOption, setSortOption] = useState('newest');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-
-  // Debug: Log quando o componente é montado
-  useEffect(() => {
-    console.log('Home component mounted');
-  }, []);
 
   const loadOrders = useCallback(async () => {
     setIsLoading(true);
@@ -90,6 +90,35 @@ export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar }) => {
 
   useEffect(() => {
     loadOrders();
+
+    let channel: any = null;
+
+    const setupRealtime = async () => {
+      const companyId = await getUserCompanyId();
+      if (!companyId) return;
+
+      channel = supabase
+        .channel('orders-list-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'orders',
+            filter: `company_id=eq.${companyId}`,
+          },
+          () => {
+            loadOrders();
+          }
+        )
+        .subscribe();
+    };
+
+    setupRealtime();
+
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
   }, [loadOrders]);
 
   const stats = useMemo((): Stats => {
@@ -105,16 +134,35 @@ export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar }) => {
   }, [orders, totalCount]);
 
   const filteredOrders = useMemo(() => {
-    return orders.filter(order => {
+    let result = orders.filter((order) => {
       const name = (order.customer_name || '').toLowerCase();
       const code = (order.code || '').toLowerCase();
       const matchesSearch = name.includes(searchTerm.toLowerCase()) || code.includes(searchTerm.toLowerCase());
-      const matchesStatus = statusFilter === '' || order.order_status === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
-  }, [orders, searchTerm, statusFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(totalCount / itemsPerPage));
+      const matchesStatus = statusFilter ? order.order_status === statusFilter : true;
+      const matchesPaymentStatus = paymentStatusFilter ? order.payment_status === paymentStatusFilter : true;
+      const matchesPaymentMethod = paymentMethodFilter ? order.payment_method === paymentMethodFilter : true;
+
+      return matchesSearch && matchesStatus && matchesPaymentStatus && matchesPaymentMethod;
+    });
+
+    // Sorting
+    return result.sort((a, b) => {
+      if (sortOption === 'newest') {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      } else if (sortOption === 'oldest') {
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      } else if (sortOption === 'highest_value') {
+        return (Number(b.total) || 0) - (Number(a.total) || 0);
+      } else if (sortOption === 'lowest_value') {
+        return (Number(a.total) || 0) - (Number(b.total) || 0);
+      }
+      return 0;
+    });
+  }, [orders, searchTerm, statusFilter, paymentStatusFilter, paymentMethodFilter, sortOption]);
+
+  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
+  const paginatedOrders = filteredOrders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const tableGridClass = "grid grid-cols-[1.5fr_100px_110px_120px_140px_100px_50px] gap-4 items-center px-6";
 
@@ -142,38 +190,82 @@ export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar }) => {
         {/* Barra de Filtros Padronizada */}
         <div className="flex flex-row items-center p-[12px_20px] lg:p-[12px_24px] gap-[16px] w-full bg-white border-t border-neutral-100">
           <div className="flex flex-row items-center gap-[12px] flex-1 overflow-x-auto no-scrollbar py-1">
-            <div className="relative group w-full max-w-[320px] shrink-0">
-              <i className="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 group-focus-within:text-primary-500"></i>
-              <input
-                type="text"
-                placeholder="Buscar cliente ou código..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full h-[36px] bg-white border border-neutral-200 rounded-lg pl-10 pr-4 text-body2 font-medium focus:outline-none focus:border-primary-500 transition-all shadow-small"
-              />
-            </div>
+            <TextInput
+              leftIcon="ph-magnifying-glass"
+              placeholder="Buscar cliente ou código..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              containerClassName="w-full max-w-[320px] !h-[36px]"
+            />
+            {/* Filtro Status Pedido */}
             <Dropdown
               label="Status do Pedido"
               value={statusFilter}
               onChange={setStatusFilter}
               options={[
-                { label: 'Todos', value: '' },
                 { label: 'Novos', value: 'new', color: 'bg-system-error-500' },
                 { label: 'Entregues', value: 'delivered', color: 'bg-primary-500' },
                 { label: 'Cancelados', value: 'canceled', color: 'bg-neutral-400' }
               ]}
               className="min-w-[160px] shrink-0 h-[36px]"
             />
-            {(searchTerm || statusFilter) && (
+            {/* Filtro Status Pagamento */}
+            <Dropdown
+              label="Status Pagamento"
+              value={paymentStatusFilter}
+              onChange={setPaymentStatusFilter}
+              options={[
+                { label: 'Pago', value: 'paid', color: 'bg-emerald-500' },
+                { label: 'Pendente', value: 'pending', color: 'bg-amber-500' },
+                { label: 'Falhou', value: 'failed', color: 'bg-rose-500' }
+              ]}
+              className="min-w-[160px] shrink-0 h-[36px]"
+            />
+            {/* Filtro Forma Pagamento */}
+            <Dropdown
+              label="Forma Pagamento"
+              value={paymentMethodFilter}
+              onChange={setPaymentMethodFilter}
+              options={[
+                { label: 'PIX', value: 'pix' },
+                { label: 'Cartão de Crédito', value: 'credit_card' },
+                { label: 'Boleto', value: 'boleto' }
+              ]}
+              className="min-w-[160px] shrink-0 h-[36px]"
+            />
+
+            {(searchTerm || statusFilter || paymentStatusFilter || paymentMethodFilter) && (
               <Button
-                variant="tertiary"
-                onClick={() => { setSearchTerm(''); setStatusFilter(''); }}
-                className="text-system-error-500 !h-[36px]"
+                variant="danger-light"
+                onClick={() => {
+                  setSearchTerm('');
+                  setStatusFilter('');
+                  setPaymentStatusFilter('');
+                  setPaymentMethodFilter('');
+                }}
+                className="!h-[36px]"
                 leftIcon="ph ph-x-circle"
               >
                 Limpar
               </Button>
             )}
+          </div>
+
+          {/* Sort Layout Fixed to Right */}
+          <div className="flex-none pl-4 border-l border-neutral-100 hidden lg:block">
+            <Dropdown
+              label=""
+              leftIcon="ph-sort-ascending"
+              value={sortOption}
+              onChange={setSortOption}
+              options={[
+                { label: 'Mais Recentes', value: 'newest' },
+                { label: 'Mais Antigos', value: 'oldest' },
+                { label: 'Maior Valor', value: 'highest_value' },
+                { label: 'Menor Valor', value: 'lowest_value' }
+              ]}
+              className="min-w-[160px] h-[36px]"
+            />
           </div>
         </div>
       </header>
@@ -182,50 +274,59 @@ export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar }) => {
       <div className="flex-1 overflow-y-auto custom-scrollbar p-4 lg:p-6 flex flex-col gap-6">
 
         {/* Métricas Compactas */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatsCard
-            label="Pedidos Totais"
-            value={isLoading ? '...' : totalCount}
-            icon="ph-receipt"
-            iconBgColor="bg-blue-50"
-            iconColor="text-blue-600"
-          />
-          <StatsCard
-            label="Aguardando"
-            value={isLoading ? '...' : stats.newOrders}
-            icon="ph-clock"
-            iconBgColor="bg-amber-50"
-            iconColor="text-amber-600"
-          />
-          <StatsCard
-            label="Pagos"
-            value={isLoading ? '...' : stats.paidOrders}
-            icon="ph-check-circle"
-            iconBgColor="bg-primary-50"
-            iconColor="text-primary-600"
-          />
-          <StatsCard
-            label="Receita"
-            value={isLoading ? '...' : stats.totalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-            icon="ph-bank"
-            iconBgColor="bg-indigo-50"
-            iconColor="text-indigo-600"
-          />
+        <div className="bg-neutral-100 p-1.5 rounded-2xl">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-1.5">
+            <StatsCard
+              label="Total Pedidos"
+              value={isLoading ? '...' : totalCount}
+              icon="ph-receipt"
+              iconBgColor="bg-[#F1E9FE]"
+              iconColor="text-[#955CF6]"
+            />
+            <StatsCard
+              label="Pedidos Novos"
+              value={isLoading ? '...' : stats.newOrders}
+              icon="ph-clock"
+              iconBgColor="bg-[#FFE2E5]"
+              iconColor="text-[#FF2F54]"
+            />
+            <StatsCard
+              label="Pedidos Pagos"
+              value={isLoading ? '...' : stats.paidOrders}
+              icon="ph-check-circle"
+              iconBgColor="bg-[#DCFBEE]"
+              iconColor="text-[#0AB86D]"
+            />
+            <StatsCard
+              label="Ticket Médio"
+              value={isLoading ? '...' : stats.averageTicket.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              icon="ph-tag-simple"
+              iconBgColor="bg-[#DCFBEE]"
+              iconColor="text-[#0AB86D]"
+            />
+            <StatsCard
+              label="Faturamento"
+              value={isLoading ? '...' : stats.totalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              icon="ph-currency-dollar"
+              iconBgColor="bg-[#DCFBEE]"
+              iconColor="text-[#0AB86D]"
+            />
+          </div>
         </div>
 
         {/* Listagem de Pedidos */}
         <div className="bg-white border border-neutral-200 shadow-small rounded-[12px] overflow-hidden mb-10">
           <div className="w-full overflow-x-auto">
-            <div className="min-w-[900px] w-full">
+            <div className="min-w-[1000px] w-full">
               {/* Table Header */}
-              <div className={`${tableGridClass} h-[40px] bg-secondary-700 sticky top-0 z-20`}>
-                <span className="text-body2 font-semibold text-white">Cliente</span>
-                <span className="text-body2 font-semibold text-white">Código</span>
-                <span className="text-body2 font-semibold text-white">Valor</span>
-                <span className="text-body2 font-semibold text-white text-center">Status</span>
-                <span className="text-body2 font-semibold text-white">Pagamento</span>
-                <span className="text-body2 font-semibold text-white">Data</span>
-                <span></span>
+              <div className="grid grid-cols-[100px_minmax(250px,1.5fr)_180px_140px_140px_140px_100px] gap-4 items-center px-6 h-[40px] bg-secondary-700 sticky top-0 z-20">
+                <span className="text-body2 font-semibold text-white text-left">Código</span>
+                <span className="text-body2 font-semibold text-white text-left">Cliente</span>
+                <span className="text-body2 font-semibold text-white text-left">Valor e Status</span>
+                <span className="text-body2 font-semibold text-white text-left">Pagamento</span>
+                <span className="text-body2 font-semibold text-white text-left">Status Pedido</span>
+                <span className="text-body2 font-semibold text-white text-left">Data</span>
+                <span className="text-body2 font-semibold text-white text-left"></span>
               </div>
 
               {/* Table Body */}
@@ -235,50 +336,85 @@ export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar }) => {
                     <i className="ph ph-circle-notch animate-spin text-3xl text-neutral-300"></i>
                     <span className="text-tag font-bold text-neutral-400 uppercase tracking-widest">Sincronizando...</span>
                   </div>
-                ) : filteredOrders.length > 0 ? (
-                  filteredOrders.map((order) => {
+                ) : paginatedOrders.length > 0 ? (
+                  paginatedOrders.map((order) => {
                     const payStatus = PAYMENT_STATUS_MAP[order.payment_status] || PAYMENT_STATUS_MAP['pending'];
                     const ordStatus = ORDER_STATUS_MAP[order.order_status] || ORDER_STATUS_MAP['new'];
                     return (
                       <div
                         key={order.id}
                         onClick={() => onOrderSelect(order)}
-                        className={`${tableGridClass} min-h-[64px] py-2 hover:bg-neutral-25 transition-all group cursor-pointer`}
+                        className="grid grid-cols-[100px_minmax(250px,1.5fr)_180px_140px_140px_140px_100px] gap-4 items-center px-6 min-h-[72px] py-3 hover:bg-neutral-25 transition-all group cursor-pointer"
                       >
+                        {/* Código */}
+                        <span
+                          className="text-body2 font-bold text-neutral-600 tabular-nums hover:text-primary-600"
+                        >
+                          {order.code}
+                        </span>
+
+                        {/* Cliente */}
                         <div className="flex items-center gap-3 overflow-hidden">
                           <div className="w-9 h-9 rounded-full border border-neutral-100 bg-neutral-50 flex-none overflow-hidden shadow-small">
                             <img src={`https://ui-avatars.com/api/?name=${order.customer_name}&background=0AB86D&color=fff&bold=true`} className="w-full h-full object-cover" />
                           </div>
                           <div className="flex flex-col overflow-hidden">
                             <span className="text-body2 font-bold text-neutral-black truncate group-hover:text-primary-700 transition-colors">{order.customer_name}</span>
-                            <span className="text-[11px] text-neutral-400 font-medium truncate">{order.customer_phone}</span>
+                            <span className="text-[11px] text-neutral-400 font-medium truncate">
+                              {order.customer_phone ? order.customer_phone.replace(/^(\d{2})(\d{2})(\d{5})(\d{4})$/, '+$1 ($2) $3-$4') : '-'}
+                            </span>
                           </div>
                         </div>
 
-                        <span className="text-body2 font-bold text-neutral-600 tabular-nums bg-neutral-50 px-2 py-0.5 rounded border border-neutral-100 w-fit">{order.code}</span>
+                        {/* Valor e Status de Pagamento */}
+                        <div className="flex flex-col gap-1 items-start text-left">
+                          <span className="text-body2 font-bold text-neutral-900 tabular-nums">
+                            {(Number(order.total) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </span>
+                          <div className="flex items-center gap-1.5 justify-start">
+                            <div className={`w-1.5 h-1.5 rounded-full ${payStatus.variant === 'success' ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
+                            <span className={`text-[11px] font-medium uppercase tracking-tight ${payStatus.variant === 'success' ? 'text-emerald-700' : 'text-neutral-500'}`}>{payStatus.label}</span>
+                          </div>
+                        </div>
 
-                        <span className="text-body2 font-black text-neutral-900 tabular-nums">
-                          {(Number(order.total) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        {/* Forma de Pagamento */}
+                        <span className="text-body2 font-medium text-neutral-700 truncate text-left">
+                          {ordersService.formatPaymentMethod ? ordersService.formatPaymentMethod(order.payment_method) : (order.payment_method || '-')}
                         </span>
 
-                        <div className="flex justify-center">
+                        {/* Status do Pedido */}
+                        <div className="flex justify-start">
                           <Badge variant={ordStatus.variant}>{ordStatus.label}</Badge>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                          <div className={`w-1.5 h-1.5 rounded-full ${payStatus.variant === 'success' ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
-                          <span className="text-tag font-bold text-neutral-700 uppercase tracking-tight">{payStatus.label}</span>
+                        {/* Data */}
+                        <div className="flex flex-col items-start text-left gap-0.5">
+                          <span className="text-body2 font-bold text-neutral-900 tabular-nums">{new Date(order.created_at).toLocaleDateString('pt-BR')}</span>
+                          <span className="text-[11px] font-medium text-neutral-400 tabular-nums">{new Date(order.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
 
-                        <div className="flex flex-col">
-                          <span className="text-body2 font-bold text-neutral-800 tabular-nums">{new Date(order.created_at).toLocaleDateString('pt-BR')}</span>
-                          <span className="text-[10px] font-bold text-neutral-400">{new Date(order.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
-                        </div>
-
-                        <div className="flex justify-end pr-2">
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-neutral-50 text-neutral-300 group-hover:bg-primary-50 group-hover:text-primary-600 transition-all border border-neutral-100">
-                            <i className="ph ph-caret-right ph-bold"></i>
-                          </div>
+                        {/* Ações */}
+                        <div className="flex items-center justify-start gap-2">
+                          <IconButton
+                            icon="ph-pencil-simple"
+                            variant="neutral"
+                            size="sm"
+                            onClick={(e) => { e.stopPropagation(); onOrderSelect(order); }}
+                            title="Editar Pedido"
+                          />
+                          <IconButton
+                            icon="ph-trash"
+                            variant="delete"
+                            size="sm"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (confirm('Tem certeza que deseja excluir este pedido?')) {
+                                await ordersService.deleteOrder(order.id);
+                                loadOrders();
+                              }
+                            }}
+                            title="Excluir Pedido"
+                          />
                         </div>
                       </div>
                     );
@@ -298,9 +434,9 @@ export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar }) => {
             </div>
           </div>
 
-          <div className="flex items-center justify-between p-4 border-t border-neutral-100 bg-neutral-50/30">
+          <div className="flex items-center justify-between p-4 border-t border-neutral-100 bg-white">
             <span className="text-body2 font-medium text-neutral-500">
-              Exibindo <span className="font-bold text-neutral-black">{filteredOrders.length}</span> resultados
+              Exibindo <span className="font-bold text-neutral-black">{filteredOrders.length}</span> de <span className="font-bold text-neutral-black">{totalCount}</span> Resultado(s)
             </span>
             <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
           </div>

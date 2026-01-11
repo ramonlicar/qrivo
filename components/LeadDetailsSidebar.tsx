@@ -5,6 +5,8 @@ import { Button } from './Button';
 import { TextInput } from './TextInput';
 import { TextArea } from './TextArea';
 import { Switch } from './Switch';
+import { useNavigate } from 'react-router-dom';
+import { Badge } from './Badge';
 
 import { customersService, ordersService } from '../lib/services';
 
@@ -29,6 +31,30 @@ const TAG_COLORS = [
   { name: 'Highlight', class: 'bg-system-highlight-500' },
 ];
 
+const ORDER_STATUS_MAP: Record<string, { label: string; variant: 'error' | 'success' | 'warning' | 'neutral' }> = {
+  'new': { label: 'Novo', variant: 'warning' },
+  'preparing': { label: 'Preparando', variant: 'warning' },
+  'shipped': { label: 'Enviado', variant: 'warning' },
+  'delivered': { label: 'Entregue', variant: 'success' },
+  'canceled': { label: 'Cancelado', variant: 'neutral' },
+  'archived': { label: 'Arquivado', variant: 'neutral' },
+  'NOVO': { label: 'Novo', variant: 'warning' },
+  'PREPARANDO': { label: 'Preparando', variant: 'warning' },
+  'ENTREGUE': { label: 'Entregue', variant: 'success' },
+  'CANCELADO': { label: 'Cancelado', variant: 'neutral' },
+  'ARQUIVADO': { label: 'Arquivado', variant: 'neutral' },
+};
+
+const PAYMENT_STATUS_MAP: Record<string, { label: string; variant: 'success' | 'error' | 'warning' | 'neutral' }> = {
+  'paid': { label: 'Pago', variant: 'success' },
+  'pending': { label: 'Pendente', variant: 'warning' },
+  'refunded': { label: 'Reembolsado', variant: 'error' },
+  'canceled': { label: 'Cancelado', variant: 'neutral' },
+  'PAGO': { label: 'Pago', variant: 'success' },
+  'PENDENTE': { label: 'Pendente', variant: 'warning' },
+  'REEMBOLSADO': { label: 'Reembolsado', variant: 'error' },
+};
+
 export const LeadDetailsSidebar: React.FC<LeadDetailsSidebarProps> = ({
   isOpen,
   onClose,
@@ -40,6 +66,7 @@ export const LeadDetailsSidebar: React.FC<LeadDetailsSidebarProps> = ({
   onEdit,
   companyId
 }) => {
+  const navigate = useNavigate();
   const [newNote, setNewNote] = useState('');
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [tagInput, setTagInput] = useState('');
@@ -284,33 +311,39 @@ export const LeadDetailsSidebar: React.FC<LeadDetailsSidebarProps> = ({
                 </div>
               ) : (
                 <div className="flex flex-col gap-4">
-                  {customerOrders.map(order => (
-                    <div key={order.id} className="p-4 border border-neutral-100 rounded-xl bg-white shadow-sm flex flex-col gap-3">
-                      <div className="flex justify-between items-start">
-                        <div className="flex flex-col">
-                          <span className="text-small font-bold text-neutral-900">Pedido #{order.code || order.id.slice(0, 6)}</span>
-                          <span className="text-[11px] text-neutral-500">
-                            {new Date(order.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  {customerOrders.map(order => {
+                    const payStatus = PAYMENT_STATUS_MAP[order.payment_status] || { label: order.payment_status, variant: 'neutral' };
+                    // const ordStatus = ORDER_STATUS_MAP[order.order_status] || { label: order.order_status, variant: 'neutral' }; // Uncomment if we decide to show order status too
+
+                    return (
+                      <div
+                        key={order.id}
+                        className="p-4 border border-neutral-100 rounded-xl bg-white shadow-sm flex flex-col gap-3 cursor-pointer hover:border-primary-200 hover:shadow-md transition-all group"
+                        onClick={() => navigate(`/pedidos/${order.id}`)}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex flex-col">
+                            <span className="text-small font-bold text-neutral-900 group-hover:text-primary-600 transition-colors">Pedido #{order.code || order.id.slice(0, 6)}</span>
+                            <span className="text-[11px] text-neutral-500">
+                              {new Date(order.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <Badge variant={payStatus.variant as any}>
+                            {payStatus.label}
+                          </Badge>
+                        </div>
+
+                        <div className="h-px bg-neutral-50 w-full" />
+
+                        <div className="flex justify-between items-center">
+                          <span className="text-[11px] text-neutral-500 font-medium">Items: {order.items?.length || 0}</span>
+                          <span className="text-body2 font-bold text-neutral-900 tabular-nums">
+                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.total || 0)}
                           </span>
                         </div>
-                        <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider
-                                  ${order.payment_status === 'paid' || order.payment_status === 'PAGO' ? 'bg-system-success-50 text-system-success-700' :
-                            order.payment_status === 'pending' || order.payment_status === 'PENDENTE' ? 'bg-system-warning-50 text-system-warning-700' : 'bg-neutral-100 text-neutral-500'}
-                                `}>
-                          {order.payment_status}
-                        </span>
                       </div>
-
-                      <div className="h-px bg-neutral-50 w-full" />
-
-                      <div className="flex justify-between items-center">
-                        <span className="text-[11px] text-neutral-500 font-medium">Items: {order.items?.length || 0}</span>
-                        <span className="text-body2 font-bold text-neutral-900 tabular-nums">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.total || 0)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

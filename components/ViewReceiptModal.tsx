@@ -9,9 +9,10 @@ interface ViewReceiptModalProps {
   receiptUrl?: string;
   onEdit: (file: File) => void;
   onDownload: () => void;
+  onDelete: () => void;
 }
 
-export const ViewReceiptModal: React.FC<ViewReceiptModalProps> = ({ isOpen, onClose, receiptUrl, onEdit, onDownload }) => {
+export const ViewReceiptModal: React.FC<ViewReceiptModalProps> = ({ isOpen, onClose, receiptUrl, onEdit, onDownload, onDelete }) => {
   const editFileInputRef = useRef<HTMLInputElement>(null);
 
   const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -23,39 +24,51 @@ export const ViewReceiptModal: React.FC<ViewReceiptModalProps> = ({ isOpen, onCl
   const isPdf = receiptUrl?.endsWith('.pdf') && !receiptUrl.startsWith('blob:');
 
   return (
-    <Modal 
-      isOpen={isOpen} 
-      onClose={onClose} 
-      title="Comprovante de Pagamento" 
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={<span className="text-body1 font-bold text-neutral-900">Comprovante de Pagamento</span>}
       maxWidth="500px"
       footer={
-        <div className="flex flex-row items-center gap-4">
-          <Button 
-            variant="primary" 
-            className="flex-1 !h-[34px] !font-bold" 
-            leftIcon="ph ph-bold ph-pencil-simple" 
-            onClick={() => editFileInputRef.current?.click()}
-          >
-            Trocar Arquivo
-          </Button>
-          <Button 
-            variant="secondary" 
-            className="flex-1 !h-[34px] !font-bold" 
-            leftIcon="ph ph-bold ph-download-simple" 
-            onClick={onDownload} 
+        <div className="flex items-center justify-between gap-3 w-full">
+          <Button
+            variant="danger-light"
+            className="w-9 h-9 !p-0 flex items-center justify-center flex-none"
+            onClick={onDelete}
             disabled={!receiptUrl}
+            title="Excluir Comprovante"
           >
-            Download
+            <i className="ph ph-bold ph-trash text-lg"></i>
           </Button>
+
+          <div className="flex items-center gap-3">
+            <Button
+              variant="secondary"
+              className="px-4"
+              leftIcon="ph ph-bold ph-download-simple"
+              onClick={onDownload}
+              disabled={!receiptUrl}
+            >
+              Download
+            </Button>
+            <Button
+              variant="primary"
+              className="px-4"
+              leftIcon="ph ph-bold ph-pencil-simple"
+              onClick={() => editFileInputRef.current?.click()}
+            >
+              Trocar Arquivo
+            </Button>
+          </div>
         </div>
       }
     >
-      <input 
-        type="file" 
-        ref={editFileInputRef} 
-        className="hidden" 
-        onChange={handleEditChange} 
-        accept="image/*,application/pdf" 
+      <input
+        type="file"
+        ref={editFileInputRef}
+        className="hidden"
+        onChange={handleEditChange}
+        accept="image/*,application/pdf"
       />
       <div className="w-full aspect-[4/3] bg-neutral-50 rounded-xl border border-neutral-100 overflow-hidden flex items-center justify-center relative group">
         {isPdf ? (

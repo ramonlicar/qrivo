@@ -452,7 +452,7 @@ export const Customers: React.FC = () => {
                 <span className="text-[13px] font-semibold text-white">Cliente</span>
                 <span className="hidden sm:block text-[13px] font-semibold text-white">Etiquetas</span>
                 <span className="hidden sm:block text-[13px] font-semibold text-white">Valor Gasto</span>
-                <span className="hidden lg:block text-[13px] font-semibold text-white">Cadastrado em</span>
+                <span className="hidden lg:block text-[13px] font-semibold text-white text-left">Cadastro</span>
                 <span className="text-[13px] font-semibold text-white text-center">Agente IA</span>
                 <span></span>
               </div>
@@ -511,9 +511,12 @@ export const Customers: React.FC = () => {
 
 
                       {/* Data Col (Hidden on tablets/mobile) */}
-                      <div className="hidden lg:flex flex-col items-start overflow-hidden">
+                      <div className="hidden lg:flex flex-col items-start overflow-hidden gap-0.5">
                         <span className="text-body2 font-bold text-neutral-900 tabular-nums">
-                          {new Date(customer.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })} {new Date(customer.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          {new Date(customer.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                        </span>
+                        <span className="text-[11px] font-medium text-neutral-400 tabular-nums">
+                          {new Date(customer.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
 
@@ -564,7 +567,7 @@ export const Customers: React.FC = () => {
           {/* Pagination Footer */}
           <div className="flex flex-col sm:flex-row items-center justify-between p-4 gap-4 border-t border-neutral-100 bg-white">
             <span className="text-body2 font-medium text-neutral-500 order-2 sm:order-1 text-center sm:text-left">
-              Mostrando <span className="font-bold text-neutral-black">{paginatedCustomers.length}</span> de {filteredCustomers.length}
+              Exibindo <span className="font-bold text-neutral-black">{paginatedCustomers.length}</span> de <span className="font-bold text-neutral-black">{filteredCustomers.length}</span> Resultado(s)
             </span>
             <div className="order-1 sm:order-2 overflow-x-auto w-full sm:w-auto flex justify-center">
               <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />

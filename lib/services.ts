@@ -1,6 +1,6 @@
-
 import { supabase } from './supabase';
-import { CartItem, Product } from '../types';
+export { supabase };
+import { CartItem, Product, OrderActivity } from '../types';
 import { aiService } from './aiService';
 
 // --- Interfaces de Retorno ---
@@ -660,6 +660,37 @@ export const ordersService = {
     return { data: data || [], count: count || 0, error };
   },
 
+  async getOrderById(orderId: string): Promise<{ data: any; error: any }> {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*, items:order_items(*)')
+      .eq('id', orderId)
+      .maybeSingle();
+
+    return { data: data || null, error };
+  },
+
+  async deleteOrder(orderId: string): Promise<{ error: any }> {
+    const { error } = await supabase
+      .from('orders')
+      .delete()
+      .eq('id', orderId);
+
+    return { error };
+  },
+
+  formatPaymentMethod(method: string | undefined): string {
+    if (!method) return '-';
+    const map: Record<string, string> = {
+      'credit_card': 'Cartão de Crédito',
+      'debit_card': 'Cartão de Débito',
+      'pix': 'PIX',
+      'boleto': 'Boleto',
+      'cash': 'Dinheiro',
+      'transfer': 'Transferência'
+    };
+    return map[method] || method;
+  },
 
   async getOrdersByCustomer(companyId: string, customerId: string): Promise<PaginatedResponse<any>> {
     const { data, error, count } = await supabase
@@ -713,6 +744,29 @@ export const ordersService = {
       newOrdersToday,
       recentOrders
     };
+  },
+
+  async getOrderHistory(orderId: string) {
+    const { data, error } = await supabase
+      .from('order_history')
+      .select('*')
+      .eq('order_id', orderId)
+      .order('created_at', { ascending: false });
+
+    return { data: data as OrderActivity[], error };
+  },
+
+  async addOrderActivity(orderId: string, companyId: string, actionType: string, description: string) {
+    const { error } = await supabase
+      .from('order_history')
+      .insert({
+        order_id: orderId,
+        company_id: companyId,
+        action_type: actionType,
+        description: description
+      });
+
+    return { error };
   }
 };
 

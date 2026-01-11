@@ -13,7 +13,7 @@ export const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages,
 
   const buttonBaseClass = "flex items-center justify-center w-8 h-8 rounded-md border border-neutral-100 transition-all flex-none";
   const activeClass = "bg-white text-neutral-600 hover:text-neutral-900 hover:border-neutral-300 hover:bg-neutral-25 active:scale-95 shadow-sm";
-  const disabledClass = "bg-neutral-25 cursor-not-allowed opacity-40 border-neutral-50 text-neutral-300";
+  const disabledClass = "bg-neutral-25 cursor-not-allowed opacity-60 border-neutral-100 text-neutral-400";
   const iconClass = "text-[16px]";
 
   return (

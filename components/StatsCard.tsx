@@ -11,21 +11,19 @@ interface StatsCardProps {
 
 export const StatsCard: React.FC<StatsCardProps> = ({ label, value, icon, iconBgColor, iconColor }) => {
   return (
-    <div className="box-border flex flex-row items-center justify-between p-5 w-full min-h-[88px] bg-white border border-neutral-100 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 group cursor-default">
-      {/* Coluna Esquerda: Valor e Label */}
-      <div className="flex flex-col items-start gap-1 overflow-hidden">
-        <span className="text-[22px] font-black text-neutral-900 tracking-tight leading-none truncate w-full">
-          {value}
-        </span>
-        <span className="text-[10px] font-black text-neutral-300 uppercase tracking-widest whitespace-nowrap">
+    <div className="flex flex-col items-start p-[12px] w-full min-h-[94px] bg-white border-[1.2px] border-[#E8E8E3] shadow-[0px_3px_6px_rgba(0,0,0,0.05)] rounded-[14px]">
+      <div className="flex flex-row justify-between items-center w-full mb-auto">
+        <span className="text-body2 font-semibold text-[#2C2C2A]">
           {label}
         </span>
+        <div className={`flex flex-row justify-center items-center w-[38px] h-[38px] rounded-[9px] ${iconBgColor}`}>
+          <i className={`ph ${icon} text-[19px] ${iconColor}`}></i>
+        </div>
       </div>
 
-      {/* Coluna Direita: Ícone com Fundo Colorido */}
-      <div className={`flex flex-none items-center justify-center w-10 h-10 ${iconBgColor} rounded-lg shadow-sm transition-transform group-hover:scale-105 ml-2 border border-black/5`}>
-        <i className={`ph ${icon} text-[20px] ${iconColor}`}></i>
-      </div>
+      <span className="text-h3 font-bold text-[#01040E] mt-auto">
+        {value}
+      </span>
     </div>
   );
 };

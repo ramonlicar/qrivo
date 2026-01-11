@@ -25,6 +25,7 @@ const OnboardingPage = lazy(() => import('./components/OnboardingPage').then(m =
 const AcceptInvitePage = lazy(() => import('./components/AcceptInvitePage').then(m => ({ default: m.AcceptInvitePage })));
 const ResetPasswordPage = lazy(() => import('./components/ResetPasswordPage').then(m => ({ default: m.ResetPasswordPage })));
 const DesignSystemPage = lazy(() => import('./components/DesignSystemPage').then(m => ({ default: m.default })));
+const OrderTracking = lazy(() => import('./components/OrderTracking'));
 
 const LoadingState = () => (
   <div className="min-h-screen w-full bg-neutral-25 flex flex-col items-center justify-center p-6 gap-4">
@@ -204,6 +205,7 @@ const App: React.FC = () => {
   const effectiveActivePath = useMemo(() => {
     if (selectedOrder) return '/';
     if (location.pathname.startsWith('/produtos')) return '/produtos';
+    if (location.pathname.startsWith('/pedidos')) return '/';
     return location.pathname;
   }, [location.pathname, selectedOrder]);
 
@@ -241,6 +243,16 @@ const App: React.FC = () => {
     );
   }
 
+  if (location.pathname.startsWith('/rastreio/')) {
+    return (
+      <Suspense fallback={<LoadingState />}>
+        <Routes>
+          <Route path="/rastreio/:id" element={<OrderTracking />} />
+        </Routes>
+      </Suspense>
+    );
+  }
+
   if (!session) {
     return (
       <Suspense fallback={<LoadingState />}>
@@ -273,7 +285,6 @@ const App: React.FC = () => {
             setSettingsInitialTab(undefined);
             navigate(path);
           }
-          setSelectedOrder(null);
         }}
         userProfile={userProfile}
         userStats={userStats}
@@ -283,13 +294,8 @@ const App: React.FC = () => {
           <div className="w-full h-full bg-white border border-neutral-200 shadow-cards rounded-[12px] sm:rounded-[16px] overflow-hidden">
             <Suspense fallback={<LoadingState />}>
               <Routes>
-                <Route path="/" element={
-                  selectedOrder ? (
-                    <OrderDetails order={selectedOrder} onBack={() => setSelectedOrder(null)} />
-                  ) : (
-                    <Home onOrderSelect={(order) => setSelectedOrder(order)} onOpenSidebar={() => setIsSidebarOpen(true)} />
-                  )
-                } />
+                <Route path="/" element={<Home onOrderSelect={(order) => navigate(`/pedidos/${order.id}`)} onOpenSidebar={() => setIsSidebarOpen(true)} />} />
+                <Route path="/pedidos/:id" element={<OrderDetails onBack={() => navigate('/')} />} />
                 <Route path="/vendedor-ia" element={<VendedorIA />} />
                 <Route path="/funil-vendas" element={<FunilVendas />} />
                 <Route path="/clientes" element={<Customers />} />
@@ -308,7 +314,7 @@ const App: React.FC = () => {
 
                 <Route path="/produtos/detalhes" element={
                   selectedProductForView ? (
-                    <ProductDetails product={selectedProductForView} onBack={() => navigate('/produtos')} onEdit={(p) => navigate(`/produtos/editar/${p.id}`)} onDelete={() => navigate('/produtos')} />
+                    <ProductDetails product={selectedProductForView} onBack={() => { setSelectedProductForView(null); navigate('/produtos'); }} onEdit={(p) => navigate(`/produtos/editar/${p.id}`)} onDelete={() => navigate('/produtos')} />
                   ) : <Navigate to="/produtos" />
                 } />
 
