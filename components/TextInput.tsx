@@ -18,7 +18,7 @@ export const TextInput: React.FC<TextInputProps> = ({
 }) => {
   return (
     <div className={`
-      box-border flex flex-row items-center p-[0px_12px] gap-[10px] h-[40px] bg-white border border-neutral-200 rounded-md
+      box-border flex flex-row items-center p-[0px_12px] gap-[10px] h-[36px] bg-white border border-neutral-200 rounded-md
       focus-within:border-neutral-900 transition-all group shadow-sm
       ${containerClassName}
     `}>

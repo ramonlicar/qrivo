@@ -166,7 +166,7 @@ export const Products: React.FC<ProductsProps> = ({ onEdit, onAddNew, onViewDeta
             >
               Categorias ({categories.length})
             </Button>
-            <Button variant="primary" className="!h-[40px] font-bold shadow-sm" leftIcon="ph ph-plus" onClick={onAddNew}>Novo Produto</Button>
+            <Button variant="primary" className="!h-[36px] font-bold shadow-sm" leftIcon="ph ph-plus" onClick={onAddNew}>Novo Produto</Button>
           </div>
         </div>
         <div className="flex flex-row items-center p-[12px_20px] lg:p-[12px_24px] gap-[16px] w-full bg-white border-t border-neutral-100">

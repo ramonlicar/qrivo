@@ -211,7 +211,7 @@ export const Home: React.FC<HomeProps> = ({ onOrderSelect, onOpenSidebar, onNewO
           </div>
 
           <div className="flex items-center gap-3">
-            <Button variant="primary" className="!h-[40px] font-bold shadow-sm" leftIcon="ph ph-plus" onClick={onNewOrder}>Novo Pedido</Button>
+            <Button variant="primary" className="!h-[36px] font-bold shadow-sm" leftIcon="ph ph-plus" onClick={onNewOrder}>Novo Pedido</Button>
           </div>
         </div>
 

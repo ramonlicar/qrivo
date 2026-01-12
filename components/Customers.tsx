@@ -374,7 +374,7 @@ export const Customers: React.FC = () => {
             <p className="hidden sm:block text-body2 font-normal text-neutral-500 m-0 truncate w-full">Gerencie sua base de contatos e histórico de compras.</p>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="primary" className="!h-[40px] font-bold shadow-sm" leftIcon="ph ph-plus" onClick={handleOpenNewModal}>Novo Cliente</Button>
+            <Button variant="primary" className="!h-[36px] font-bold shadow-sm" leftIcon="ph ph-plus" onClick={handleOpenNewModal}>Novo Cliente</Button>
           </div>
         </div>
 

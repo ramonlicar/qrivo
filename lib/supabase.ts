@@ -38,6 +38,18 @@ export const getUserCompanyId = async () => {
     return session.user.user_metadata.company_id;
   }
 
-  // 2. Fallback to user.id (Legacy/Compat)
+  // 2. Check memberships table (more reliable than fallback)
+  const { data: membership } = await supabase
+    .from('memberships')
+    .select('company_id')
+    .eq('user_id', session.user.id)
+    .limit(1)
+    .single();
+
+  if (membership?.company_id) {
+    return membership.company_id;
+  }
+
+  // 3. Fallback to user.id (Legacy/Compat)
   return session.user.id;
 };
